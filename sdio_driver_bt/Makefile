@@ -15,7 +15,7 @@ $(AMLBT_MOD_NAME)-objs := $(AMLBT_CFILES:.c=.o)
 obj-m := $(AMLBT_MOD_NAME).o
 
 all:
-	make -C $(KERNEL_SRC) M=$(M) modules
+	make -C $(KERNEL_SRC) M=$(M) KBUILD_EXTRA_SYMBOLS=$(EXTRA_SYMBOLS_PATH_SDIO_BT) modules
 
 modules_install:
 	@$(MAKE) INSTALL_MOD_STRIP=1 M=$(M) -C $(KERNEL_SRC) modules_install
