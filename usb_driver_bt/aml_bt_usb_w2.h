@@ -16,7 +16,7 @@ typedef unsigned long SYS_TYPE;
 #define HI_USB_RX_Q_ADDR        (0x00514000) //start:0x00514000, end:0x00515000, length:4096 bytes
 #define HI_USB_CMD_Q_ADDR       (0x00518000) //start:0x00518000, end:0x00519000, length:4096 bytes
 
-#define HI_USB_TX_Q_LEN         (1024)
+#define HI_USB_TX_Q_LEN         (1028)
 #define HI_USB_RX_Q_LEN         (1024)
 #define BT_EVENT_QUEUE_LEN      (2048)
 #define BT_CMD_QUEUE_LEN        (2048)
@@ -157,10 +157,10 @@ typedef unsigned long SYS_TYPE;
 
 
 
-#define HCI_MAX_ACL_SIZE    1020
+#define HCI_MAX_ACL_SIZE    1021
 #define HCI_MAX_SCO_SIZE    255
 #define HCI_MAX_EVENT_SIZE    260
-#define HCI_MAX_FRAME_SIZE    (HCI_MAX_ACL_SIZE + 4)
+#define HCI_MAX_FRAME_SIZE    (HCI_MAX_ACL_SIZE + 7)
 
 #define HCI_COMMAND_PKT        0x01
 #define HCI_ACLDATA_PKT        0x02
@@ -405,6 +405,17 @@ struct amlw1_hif_ops {
 	void				(*hif_pt_rx_stop)(void);
 
 	int				(*hif_suspend)(unsigned int suspend_enable);
+};
+
+struct aml_bus_state_detect {
+  unsigned char bus_err;
+  unsigned char is_drv_load_finished;
+  unsigned char bus_reset_ongoing;
+  unsigned char is_load_by_timer;
+  unsigned char is_recy_ongoing;
+  struct timer_list timer;
+  struct work_struct detect_work;
+  int (*insmod_drv)(void);
 };
 
 #define BT_BIT  0               //means bt

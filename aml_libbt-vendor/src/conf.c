@@ -74,6 +74,7 @@ unsigned int amlbt_poweron =AML_SDIO_EN;
 unsigned int amlbt_rftype =AML_DOUBLE_ANTENNA;
 unsigned int amlbt_chiptype =AML_W1U;
 unsigned int amlbt_btrecovery = 0;
+unsigned int amlbt_btsink = 0;
 
 /******************************************************************************
 **  Static variables
@@ -214,13 +215,17 @@ void load_aml_stack_conf()
             amlbt_poweron = strtol(aml_trim(split+1), &endptr, 0);
 			ALOGE("%s amlbt_poweron '%d'", __func__, amlbt_poweron);
         }
-        else if (!strcmp(aml_trim(line_f), "BtChip")) {
+        else if(!strcmp(aml_trim(line_f), "BtChip")) {
             amlbt_chiptype = strtol(aml_trim(split+1), &endptr, 0);
 			ALOGE("%s amlbt_chiptype '%d'", __func__, amlbt_chiptype);
         }
         else if (!strcmp(aml_trim(line_f), "BtRecovery")) {
             amlbt_btrecovery = strtol(aml_trim(split+1), &endptr, 0);
             ALOGE("%s amlbt_btrecovery '%d'", __func__, amlbt_btrecovery);
+        }
+        else if (!strcmp(aml_trim(line_f), "BtSink")) {
+            amlbt_btsink = strtol(aml_trim(split+1), &endptr, 0);
+            ALOGE("%s amlbt_btsink '%d'", __func__, amlbt_btsink);
         }
     }
     fclose(fp);

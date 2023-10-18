@@ -20,13 +20,14 @@
 #include <linux/semaphore.h>
 #include <linux/poll.h>
 #include <linux/platform_device.h>
+#include <linux/amlogic/pm.h>
 
 #define AML_BT_ROM_CHECK        0
 
 #include "bt_fucode.h"
 #include "aml_bt_usb.h"
 
-#define AML_BT_VERSION  (0x20230704)
+#define AML_BT_VERSION  (0x20231012)
 #define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
 #define INDEPENDENT_USB			0
 
@@ -99,6 +100,7 @@ static unsigned char type_buff[RX_TYPE_FIFO_LEN] = {0};
 extern struct auc_hif_ops g_auc_hif_ops;
 extern struct usb_device *g_udev;
 extern int auc_send_cmd(unsigned int addr, unsigned int len);
+static struct early_suspend amlbt_early_suspend;
 
 struct completion usb_completion;
 static unsigned int fw_cmd_w = 0;
@@ -1762,10 +1764,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
         return -EINVAL;
     }
 
-    if (p_acl_buf[0] != 0xf3 && p_acl_buf[1] == 0xfe)
-    {
-        gdsl_fifo_copy_data(g_lib_cmd_fifo, p_acl_buf, 2);
-    }
+    gdsl_fifo_copy_data(g_lib_cmd_fifo, p_acl_buf, 2);
 
     if (p_acl_buf[0] == 0xf3 && p_acl_buf[1] == 0xfe)   //download fw
     {
@@ -1814,7 +1813,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
         offset = ((p_acl_buf[6] << 24) | (p_acl_buf[5] << 16) | (p_acl_buf[4] << 8) | p_acl_buf[3]);
         reg_value = ((p_acl_buf[10] << 24) | (p_acl_buf[9] << 16) | (p_acl_buf[8] << 8) | p_acl_buf[7]);
         printk("WR:%#x,%#x\n", offset, reg_value);
-        if (offset == 0xa7000c) //rf calibration
+        if (offset == 0xa70014 && !(reg_value & (1 << 24))) //rf calibration
         {
             //amlbt_usb_firmware_check();
             if (!download_flag)
@@ -2625,10 +2624,34 @@ static void amlbt_sdio_rmmod(void)
         printk("------sdio bt driver rmmod end------\n");
     }
 }
+static void bt_earlysuspend(struct early_suspend *h)
+{
+    printk("%s \n", __func__);
+}
+
+static void bt_lateresume(struct early_suspend *h)
+{
+    unsigned int reg_value = 0;
+
+    if (INTF_TYPE_IS_SDIO(amlbt_if_type))
+    {
+        reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A52);
+        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        reg_value &= ~(1 << 26);
+        g_w1_hif_ops.bt_hi_write_word(RG_AON_A52, reg_value);
+        printk("RG_AON_A52:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A52));
+    }
+}
 
 static int amlbt_sdio_probe(struct platform_device *dev)
 {
-    unsigned int ret = amlbt_sdio_insmod();
+    unsigned int ret = 0;
+    amlbt_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+    amlbt_early_suspend.suspend = bt_earlysuspend;
+    amlbt_early_suspend.resume = bt_lateresume;
+    amlbt_early_suspend.param = dev;
+    register_early_suspend(&amlbt_early_suspend);
+    ret  = amlbt_sdio_insmod();
     if (FAMILY_TYPE_IS_W1(amlbt_if_type))
     {
         unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
@@ -2654,27 +2677,20 @@ static int amlbt_sdio_remove(struct platform_device *dev)
 
 static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
 {
-    if (FAMILY_TYPE_IS_W1(amlbt_if_type))
+    if (INTF_TYPE_IS_SDIO(amlbt_if_type))
     {
-        unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
-        printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
-        reg_value |= (1 << 31);
-        g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-        printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
+        unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A52);
+        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        reg_value |= (1 << 26);
+        g_w1_hif_ops.bt_hi_write_word(RG_AON_A52, reg_value);
+        printk("RG_AON_A52:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A52));
     }
     return 0;
 }
 
 static int amlbt_sdio_resume(struct platform_device *dev)
 {
-    if (FAMILY_TYPE_IS_W1(amlbt_if_type))
-    {
-        unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
-        printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
-        reg_value &= ~(1 << 31);
-        g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-        printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
-    }
+    printk("%s", __func__);
     return 0;
 }
 
@@ -2693,7 +2709,20 @@ static void amlbt_dev_release(struct device *dev)
 {
     return;
 }
+static void btusb_earlysuspend(struct early_suspend *h)
+{
+    printk("%s \n", __func__);
+}
 
+static void btusb_lateresume(struct early_suspend *h)
+{
+    unsigned int reg_value = g_auc_hif_ops.bt_hi_read_word(RG_AON_A52);
+    printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+    reg_value &= ~(1 << 26);
+    g_auc_hif_ops.bt_hi_write_word(RG_AON_A52, reg_value);
+    printk("RG_AON_A52:%#x", g_auc_hif_ops.bt_hi_read_word(RG_AON_A52));
+    suspend_value = 0;
+}
 static int amlbt_usb_probe(struct platform_device *dev)
 {
     int err = 0;
@@ -2701,6 +2730,11 @@ static int amlbt_usb_probe(struct platform_device *dev)
     //g_auc_hif_ops.bt_hi_write_word((unsigned int)0x00a0d0e4, 0x8000007f);
     //printk("%s, %#x", __func__, g_auc_hif_ops.bt_hi_read_word(0x00a0d0e4));
     printk("%s \n", __func__);
+    amlbt_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+    amlbt_early_suspend.suspend = btusb_earlysuspend;
+    amlbt_early_suspend.resume = btusb_lateresume;
+    amlbt_early_suspend.param = dev;
+    register_early_suspend(&amlbt_early_suspend);
     err = amlbt_usb_char_init();
     if (err < 0)
     {
@@ -2744,11 +2778,11 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
     suspend_value = 1;
     if (FAMILY_TYPE_IS_W1U(amlbt_if_type))
     {
-        unsigned int reg_value = g_auc_hif_ops.bt_hi_read_word(RG_AON_A15);
-        printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
-        reg_value |= (1 << 31);
-        g_auc_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-        printk("RG_AON_A15:%#x", g_auc_hif_ops.bt_hi_read_word(RG_AON_A15));
+        unsigned int reg_value = g_auc_hif_ops.bt_hi_read_word(RG_AON_A52);
+        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        reg_value |= (1 << 26);
+        g_auc_hif_ops.bt_hi_write_word(RG_AON_A52, reg_value);
+        printk("RG_AON_A52:%#x", g_auc_hif_ops.bt_hi_read_word(RG_AON_A52));
     }
     printk("%s \n", __func__);
     return 0;
@@ -2757,17 +2791,6 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
 static int amlbt_usb_resume(struct platform_device *dev)
 {
     printk("%s\n", __func__);
-    msleep(1500);
-    if (FAMILY_TYPE_IS_W1U(amlbt_if_type))
-    {
-        unsigned int reg_value = g_auc_hif_ops.bt_hi_read_word(RG_AON_A15);
-        printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
-        reg_value &= ~(1 << 31);
-        g_auc_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-        printk("RG_AON_A15:%#x", g_auc_hif_ops.bt_hi_read_word(RG_AON_A15));
-    }
-    suspend_value = 0;
-    printk("%s \n", __func__);
     return 0;
 
 }

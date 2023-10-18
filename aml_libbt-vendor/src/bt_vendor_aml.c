@@ -97,6 +97,7 @@ void vnd_load_conf(const char *p_path);
 #endif
 extern void ms_delay(uint32_t timeout);
 extern unsigned int state;
+unsigned int hw_state = 0;
 
 enum
 {
@@ -105,7 +106,15 @@ enum
     REG_PUM_CLEAR,
 };
 
-
+enum
+{
+    hw_state_success = 0,
+    hw_state_buadrate = 1,
+    hw_state_iccm = 4,
+    hw_state_dccm = 5,
+    hw_state_cpu = 9,
+    hw_state_reset = 10,
+};
 
 /******************************************************************************
 **  Variables
@@ -133,6 +142,9 @@ static const char DRIVER_PROP_NAME[] = "vendor.sys.amlbtsdiodriver";
 static const char W1U_DRIVER_PROP_NAME[] = "vendor.sys.amlbt_w1u";
 static const char PWR_PROP_NAME[] = "sys.shutdown.requested";
 static const char CHIP_TYPE[] = "persist.vendor.bt_name";
+const char *str[6] = {"HW_STATE_SUCCESS", "HW_STATE_BUADRATE",
+                       "HW_STATE_ICCM", "HW_STATE_DCCM",
+                       "HW_STATE_CPU", "HW_STATE_RESET"};
 
 static const tUSERIAL_CFG userial_init_cfg =
 {
@@ -728,6 +740,66 @@ static void amlbt_usb_driver_unload(void)
     return;
 }
 
+static void property_set_state(void)
+{
+    int p = 0;
+    if (hw_cfg_cb.state == hw_state_success)
+    {
+        p = property_set(DRIVER_PROP_NAME, "HW_STATE_SUCCESS");
+        ALOGD("%s: %s ", __FUNCTION__, str[0]);
+    }
+    else if (hw_cfg_cb.state == hw_state_buadrate)
+    {
+        p = property_set(DRIVER_PROP_NAME, "HW_STATE_BUADRATE");
+        ALOGD("%s: %s ", __FUNCTION__, str[1]);
+    }
+    else if (hw_cfg_cb.state > hw_state_buadrate && hw_cfg_cb.state <= hw_state_iccm)
+    {
+        p = property_set(DRIVER_PROP_NAME, "HW_STATE_ICCM");
+        ALOGD("%s: %s ", __FUNCTION__, str[2]);
+    }
+    else if (hw_cfg_cb.state == hw_state_dccm)
+    {
+        p = property_set(DRIVER_PROP_NAME, "HW_STATE_DCCM");
+        ALOGD("%s: %s ", __FUNCTION__, str[3]);
+    }
+    else if (hw_cfg_cb.state > hw_state_dccm && hw_cfg_cb.state <= hw_state_cpu)
+    {
+        p = property_set(DRIVER_PROP_NAME, "HW_STATE_CPU");
+        ALOGD("%s: %s ", __FUNCTION__, str[4]);
+    }
+    else if (hw_cfg_cb.state > hw_state_cpu)
+    {
+        p = property_set(DRIVER_PROP_NAME, "HW_STATE_RESET");
+        ALOGD("%s: %s ", __FUNCTION__, str[5]);
+    }
+    if (p < 0)
+    {
+        ALOGE("%s: property_set failed!", __FUNCTION__);
+        return;
+    }
+}
+
+static void property_get_state(void)
+{
+    char value[PROPERTY_VALUE_MAX] = {'\0'};
+    int num[6] = {hw_state_success, hw_state_buadrate,
+                    hw_state_iccm, hw_state_dccm,
+                    hw_state_cpu, hw_state_reset};
+
+    property_get(DRIVER_PROP_NAME, value, "0");
+    ALOGD("%s: value %s ", __FUNCTION__, value);
+
+    for (int i = 0; i < (sizeof(str)/sizeof(&(*str))); i++)
+    {
+        if (!strcmp(value, str[i]))
+        {
+           hw_state = num[i];
+           break;
+        }
+    }
+    //ALOGD("%s: hw_state %d ", __FUNCTION__, hw_state);
+}
 
 /******************************************************************************
 **  Functions
@@ -740,8 +812,8 @@ static void amlbt_usb_driver_unload(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2023-0913-1350\n");
-    ALOGI("I272941dee445170b18e19226da228cddc004d8cd\n");
+    ALOGI("amlbt init 0x2023-1019-1415\n");
+    ALOGI("I75beddf850a8d5ece8d79b608b6f073282d955bb\n");
 
     if (p_cb == NULL)
     {
@@ -790,6 +862,10 @@ static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
     }
     userial_vendor_init();
     upio_init();
+    if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface == AML_INTF_SDIO)
+    {
+        property_get_state();
+    }
 
     vnd_load_conf(VENDOR_LIB_CONF_FILE);
 
@@ -1066,7 +1142,7 @@ int aml_hci_send_cmd(int fd, unsigned char *cmd, int cmdsize, unsigned char *rsp
         }
         /*ALOGD("aml_hci_send_cmd read rsp [%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x]",
             rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6], rsp[7], rsp[8], rsp[9], rsp[10], rsp[11]);*/
-        if (rsp[0] == 0x04 && rsp[1] == 0x0e)
+        if (rsp[0] == 0x04 && (rsp[1] == 0x0e || rsp[1] == 0x19))
         {
             break;
         }
@@ -1357,8 +1433,13 @@ static int op(bt_vendor_opcode_t opcode, void *param)
 
         case BT_VND_OP_USERIAL_CLOSE: //4
         {
+            if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface == AML_INTF_SDIO)
+            {
+                property_set_state();
+            }
             ALOGD("%s: shutdwon_status = %s ", __FUNCTION__, shutdwon_status);
-            if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface != AML_INTF_USB)
+            if ((amlbt_transtype.family_id >= AML_W1U && amlbt_transtype.interface != AML_INTF_USB)
+                && hw_cfg_cb.state == 0)
             {
                 property_get(PWR_PROP_NAME, shutdwon_status, "unknown");
                 if (strstr(shutdwon_status, "0userrequested") == NULL)
@@ -1367,18 +1448,14 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     aml_reg_pum_power_cfg_clear(g_userial_fd);
                     //aml_woble_configure(g_userial_fd);
                 }
-            }
-            if ((amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface != AML_INTF_USB)
-                && hw_cfg_cb.state == 0)
-            {
+
                 usleep(100000);
                 aml_reset_bt(g_userial_fd);
                 usleep(100000);
+
+                aml_disbt_configure(g_userial_fd);
             }
-            if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface != AML_INTF_USB)
-            {
-                    aml_disbt_configure(g_userial_fd);
-            }
+
             download_hw_crash_ioctl();
             userial_vendor_close();
             if (bt_sdio_fd != -1)
@@ -1399,7 +1476,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
         {
             uint8_t *mode = (uint8_t *)param;
 
-            if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface == AML_INTF_USB)
+            if (amlbt_transtype.family_id >= AML_W1U && amlbt_transtype.interface == AML_INTF_USB)
             {
                 if (*mode == BT_VND_LPM_DISABLE)
                 {

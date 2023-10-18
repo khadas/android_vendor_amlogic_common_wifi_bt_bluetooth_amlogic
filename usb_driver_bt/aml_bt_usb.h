@@ -258,6 +258,7 @@ struct amlw1_hif_ops {
 
 #define CHIP_INTF_REG_BASE               (0xf00000)
 #define RG_AON_A15                                (CHIP_INTF_REG_BASE + 0x3c)
+#define RG_AON_A52                                (CHIP_INTF_REG_BASE + 0xd0)
 
 // pmu status
 #define PMU_PWR_OFF       0x0

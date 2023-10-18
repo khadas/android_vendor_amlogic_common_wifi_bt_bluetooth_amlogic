@@ -6,8 +6,9 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
+#include <linux/amlogic/pm.h>
 
-
+static struct early_suspend amlbt_early_suspend;
 extern unsigned char (*host_wake_w1_req)(void);
 static int reg_config_complete = 0;
 static struct cdev BTAML_cdev;
@@ -17,7 +18,7 @@ static struct class *pBTClass;
 static struct device *pBTDev;
 #define BT_NODE "stpbt"
 #define BT_DRIVER_NAME "sdio_bt"
-#define BT_AML_SDIOBT_VERSION "v2.0.2_20230913_sdiobt"
+#define BT_AML_SDIOBT_VERSION "v2.0.2_20231007_sdiobt"
 
 static char *chip_name = "aml_w1";
 //extern unsigned int amlbt_poweron;
@@ -369,6 +370,19 @@ int  bt_aml_sdio_init(void)
     return ret;
 }
 
+static void bt_earlysuspend(struct early_suspend *h)
+{
+    printk("bt_earlysuspend \n");
+}
+
+static void bt_lateresume(struct early_suspend *h)
+{
+        unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
+        printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
+        reg_value &= ~(1<<31);
+        g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
+        printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
+}
 
 static int btaml_fops_open(struct inode *inode, struct file *file)
 {
@@ -392,6 +406,12 @@ static int amlbt_sdio_probe(struct platform_device *dev)
     int ret = bt_aml_insmod();
 
     unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
+
+    amlbt_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+    amlbt_early_suspend.suspend = bt_earlysuspend;
+    amlbt_early_suspend.resume = bt_lateresume;
+    amlbt_early_suspend.param = dev;
+    register_early_suspend(&amlbt_early_suspend);
 
     printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
 
@@ -423,6 +443,7 @@ static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
 
 static int amlbt_sdio_resume(struct platform_device *dev)
 {
+#if 0
     if ((get_resume_method() != 3) && (get_resume_method() != 7))
     {
         unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
@@ -431,6 +452,7 @@ static int amlbt_sdio_resume(struct platform_device *dev)
         g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
         printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
     }
+#endif
     return 0;
 }
 
