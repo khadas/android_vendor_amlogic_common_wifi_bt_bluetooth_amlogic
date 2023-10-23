@@ -1150,7 +1150,7 @@ int aml_hci_send_cmd(int fd, unsigned char *cmd, int cmdsize, unsigned char *rsp
 error:
     return err;
 }
-/*
+
 int aml_woble_configure(int fd)
 {
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
@@ -1164,55 +1164,18 @@ int aml_woble_configure(int fd)
     unsigned char le_scan_enable[] = {0x01, 0x0c, 0x20, 0x02, 0x01, 0x00};
     unsigned char host_sleep_VSC[] = {0x01, 0x21, 0xfc, 0x01, 0x01};
 
-    if (amlbt_transtype.interface == AML_INTF_USB)
-    {
-        hw_reset_shutdown();
-        do
-        {
-            usleep(5000);
-        }while (state == HW_RESET_SHUTDOWN);
 
-        hw_host_sleep_VSC();
-        do
-        {
-            usleep(5000);
-        }while (state == HW_HOST_SLEEP_VSC);
-
-        hw_APCF_config_manf_data();
-        do
-        {
-            usleep(5000);
-        }while (state == HW_APCE_CONFIG_MANF_DATA);
-
-        hw_le_set_evt_mask();
-        do
-        {
-            usleep(5000);
-        }while (state == HW_LE_SET_EVT_MASK);
-
-        hw_le_scan_param_setting();
-        do
-        {
-            usleep(5000);
-        }while (state == HW_LE_SCAN_PARAM_SETTING);
-        //ALOGD("state %d", state);
-        hw_le_scan_enable();
-        //ALOGD("hw_le_scan_enable");
-    }
-    else
-    {
-        aml_hci_send_cmd(fd, (unsigned char *)reset_cmd, sizeof(reset_cmd), (unsigned char *)rsp);
-        aml_hci_send_cmd(fd, (unsigned char *)host_sleep_VSC, sizeof(host_sleep_VSC), (unsigned char *)rsp);
-        aml_hci_send_cmd(fd, (unsigned char *)APCF_config_manf_data, sizeof(APCF_config_manf_data), (unsigned char *)rsp);
-        aml_hci_send_cmd(fd, (unsigned char *)le_set_evt_mask, sizeof(le_set_evt_mask), (unsigned char *)rsp);
-        aml_hci_send_cmd(fd, (unsigned char *)le_scan_param_setting, sizeof(le_scan_param_setting), (unsigned char *)rsp);
-        aml_hci_send_cmd(fd, (unsigned char *)le_scan_enable, sizeof(le_scan_enable), (unsigned char *)rsp);
-    }
+    aml_hci_send_cmd(fd, (unsigned char *)reset_cmd, sizeof(reset_cmd), (unsigned char *)rsp);
+    aml_hci_send_cmd(fd, (unsigned char *)host_sleep_VSC, sizeof(host_sleep_VSC), (unsigned char *)rsp);
+    aml_hci_send_cmd(fd, (unsigned char *)APCF_config_manf_data, sizeof(APCF_config_manf_data), (unsigned char *)rsp);
+    aml_hci_send_cmd(fd, (unsigned char *)le_set_evt_mask, sizeof(le_set_evt_mask), (unsigned char *)rsp);
+    aml_hci_send_cmd(fd, (unsigned char *)le_scan_param_setting, sizeof(le_scan_param_setting), (unsigned char *)rsp);
+    aml_hci_send_cmd(fd, (unsigned char *)le_scan_enable, sizeof(le_scan_enable), (unsigned char *)rsp);
 
 
     return 0;
 }
-*/
+
 void aml_reg_pum_power_cfg_clear(int fd)
 {
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
@@ -1454,6 +1417,15 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                 usleep(100000);
 
                 aml_disbt_configure(g_userial_fd);
+            }
+            if (amlbt_transtype.family_id == AML_W1 && amlbt_transtype.interface != AML_INTF_USB)
+            {
+                property_get(PWR_PROP_NAME, shutdwon_status, "unknown");
+                if (strstr(shutdwon_status, "0userrequested") != NULL)
+                {
+                    //ALOGD("amlbt uart shutdown");
+                    aml_woble_configure(g_userial_fd);
+                }
             }
 
             download_hw_crash_ioctl();
