@@ -1293,6 +1293,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     upio_set_bluetooth_power(UPIO_BT_POWER_ON);
                     ALOGD("libbt set_bluetooth_power");
                 }
+                rmmod("wifi_comm", 100);
                 if (bt_power == 0)
                 {
                     snprintf(driver_pram, sizeof(driver_pram), "amlbt_if_type=%d", *((int*)&amlbt_transtype));
@@ -1320,7 +1321,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     else if (amlbt_transtype.family_id == AML_W2 &&
                              amlbt_transtype.interface == AML_INTF_PCIE)
                      {
-                        rmmod("wifi_comm", 400);
+                        //rmmod("wifi_comm", 400);
                         insmod("/vendor/lib/modules/w2_comm.ko", "bus_type=pci", "w2_comm", 200);
                         //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
                         insmod("/vendor/lib/modules/w2_bt.ko", driver_pram, "w2_bt", 200);
@@ -1328,7 +1329,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     else if (amlbt_transtype.family_id == AML_W2 &&
                              amlbt_transtype.interface == AML_INTF_SDIO)
                     {
-                        rmmod("wifi_comm", 400);
+                        //rmmod("wifi_comm", 400);
                         insmod("/vendor/lib/modules/w2_comm.ko", "bus_type=sdio", "w2_comm", 200);
                         //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
                         insmod("/vendor/lib/modules/w2_bt.ko", driver_pram, "w2_bt", 200);
