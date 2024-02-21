@@ -252,7 +252,7 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
 
     ALOGI("userial vendor open: opening %s", vnd_userial.port_name);
 open_retry:
-    if ((vnd_userial.fd = open(vnd_userial.port_name, O_RDWR)) < 0)
+    if ((vnd_userial.fd = open(vnd_userial.port_name, O_RDWR|O_NONBLOCK)) < 0)
     {
         ALOGE("userial vendor open: unable to open %s, retrying....", vnd_userial.port_name);
         usleep(50000);
@@ -405,9 +405,9 @@ open_retry:
     if ((vnd_userial.fd = open(vnd_userial.port_name, O_RDWR)) < 0)
     {
         ALOGE("%s: unable to open %s: %s %d", __func__, vnd_userial.port_name, strerror(errno), cnt);
-        usleep(20000);
+        usleep(50000);
         cnt++;
-        if (cnt < 5)
+        if (cnt < 40)
             goto open_retry;
         ALOGE("userial vendor open fail!!");
         return -1;

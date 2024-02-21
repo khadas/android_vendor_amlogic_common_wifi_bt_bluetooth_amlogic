@@ -52,6 +52,8 @@
 #include "userial_vendor.h"
 #include "upio.h"
 
+void aml_15p4_tx(unsigned char *data, unsigned short len);
+extern void aml_15p4_data_cb(unsigned char *p_mem);
 
 /**********bt related path in the file system**********/
 #ifndef AML_BT_FS_PATH
@@ -72,11 +74,12 @@
 #define AML_W1U_BT_FW_USB_FILE  AML_BT_FS_PATH"/w1u_bt_fw_usb.bin"
 #define AML_W2_BT_FW_USB_FILE  AML_BT_FS_PATH"/w2_bt_fw_usb.bin"
 
-#define AML_BT_CHIP_TYPE        4
+#define AML_BT_CHIP_TYPE        5
 #define AML_BT_INTF_TYPE        3
 #define REG_DEV_RESET           0xf03058
 #define REG_PMU_POWER_CFG       0xf03040
 #define REG_RAM_PD_SHUTDWONW_SW 0xf03050
+#define REG_FW_MODE             0x00f000e0
 #define BIT_PHY                 1
 #define BIT_MAC                 (1 << 1)
 #define BIT_CPU                 (1 << 2)
@@ -89,6 +92,7 @@ extern int amlbt_btrecovery;
 extern int bt_sdio_fd;
 extern unsigned int amlbt_rftype;
 extern unsigned int amlbt_btsink;
+extern unsigned int amlbt_fw_mode;
 
 extern unsigned int hw_state;
 unsigned int state = 0;
@@ -118,6 +122,11 @@ char *amlbt_fw_bin[AML_BT_CHIP_TYPE][AML_BT_INTF_TYPE] =
         "w2_bt_fw_uart.bin",     //w2 sdio
         "w2_bt_fw_usb.bin",      //w2 usb
         "w2_bt_fw_uart.bin",     //w2 pcie
+    },
+    {
+        "w2l_bt_15p4_fw_uart.bin",     //w2l sdio
+        "w2l_bt_15p4_fw_usb.bin",      //w2 usb
+        "w2l_bt_15p4_fw_uart.bin",     //w2 pcie
     }
 };
 
@@ -159,8 +168,9 @@ char *amlbt_fw_bin[AML_BT_CHIP_TYPE][AML_BT_INTF_TYPE] =
 
 static const char VENDOR_AMLBTVER_PROPERTY[] = "vendor.sys.amlbtversion";
 static const char AML_ROM_CHECK_PROPERTY[] = "vendor.sys.amlbt_rom_check";
+static const char PWR_PROP_NAME[] = "sys.shutdown.requested";
 
-#define HCI_CMD_MAX_LEN             258
+#define HCI_CMD_MAX_LEN                         258
 
 #define HCI_READ_LOCAL_INFO                     0x1001
 #define HCI_RESET                               0x0C03
@@ -178,9 +188,12 @@ static const char AML_ROM_CHECK_PROPERTY[] = "vendor.sys.amlbt_rom_check";
 #define HCI_VSC_LAUNCH_RAM                      0xFC4E
 #define HCI_READ_LOCAL_BDADDR                   0x1009
 #define HCI_RECOVERY_CMD                        0xFF98
-#define HCI_CHECK_CMD                           0xfc51
+#define HCI_CHECK_CMD                           0xfC51
 #define HCI_VSC_WAKE_WRITE_DATA                 0xFC22
 #define HCI_HOST_SLEEP_VSC                      0xfc21
+#define HCI_FW_CLEAR_LIST                       0xfc55
+
+#define HCI_AML_15P4_CMD                        0xFF9A
 
 #ifdef AML_DOWNLOADFW_UART
     int len_iccm = 0, offset_iccm = 0;
@@ -212,7 +225,7 @@ static const char AML_ROM_CHECK_PROPERTY[] = "vendor.sys.amlbt_rom_check";
     #define RW_OPERATION_SIZE        (248)
     #define TCI_READ_REG                            0xfef0
     #define TCI_WRITE_REG                           0xfef1
-    #define TCI_UPDATE_UART_BAUDRATE        0xfef2
+    #define TCI_UPDATE_UART_BAUDRATE                0xfef2
     #define TCI_DOWNLOAD_BT_FW                      0xfef3
 #endif
 
@@ -220,7 +233,7 @@ static const char AML_ROM_CHECK_PROPERTY[] = "vendor.sys.amlbt_rom_check";
 #define HCI_EVT_CMD_CMPL_STATUS_RET_BYTE        5
 #define HCI_EVT_CMD_CMPL_LOCAL_NAME_STRING      6
 #define HCI_EVT_CMD_CMPL_LOCAL_BDADDR_ARRAY     6
-#define HCI_EVT_CMD_CMPL_LOCAL_FW_VERSION     6
+#define HCI_EVT_CMD_CMPL_LOCAL_FW_VERSION       6
 #define HCI_EVT_CMD_CMPL_OPCODE                 3
 #define LPM_CMD_PARAM_SIZE                      12
 #define UPDATE_BAUDRATE_CMD_PARAM_SIZE          6
@@ -253,12 +266,14 @@ enum
 {
     HW_RESET_CLOSE,
     HW_DISBT_CONFIGURE,
-    REG_PUM_CLEAR,
+    HW_REG_PUM_CLEAR,
+    HW_CLEAR_LIST,
 };
 
 /* Hardware Configuration State */
 enum
 {
+    HW_CFG_AML_WRITE_FIRMWARE_MODE = 0,
     HW_CFG_AML_UPDATE_BAUDRATE_UART = 1,    //1
     HW_CFG_AML_DOWNLOAD_FIRMWARE_TEST_3_UART,   //2
     HW_CFG_AML_DOWNLOAD_FIRMWARE_TEST_2_UART,  //3
@@ -314,7 +329,7 @@ typedef struct
     const uint32_t	delay_time;
 } fw_settlement_entry_t;
 
-uint8_t hw_cfg_null(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
+uint8_t hw_cfg_write_fw_mode(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_update_baudrate_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_download_firmware_test_3_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_download_firmware_test_2_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
@@ -346,7 +361,7 @@ uint8_t hw_cfg_rom_check(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 
 uint8_t (*hw_config_func[])(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p) =
 {
-    hw_cfg_null,    //0
+    hw_cfg_write_fw_mode,    //0
     hw_cfg_update_baudrate_uart,    //1
     hw_cfg_download_firmware_test_3_uart,   //2
     hw_cfg_download_firmware_test_2_uart,  //3
@@ -912,27 +927,6 @@ static uint8_t hw_config_set_rf_params(HC_BT_HDR *p_buf)
 
     BTHWDBG("antenna number=%d sink mode=%d", amlbt_rftype, amlbt_btsink);
 
-    if ((amlbt_transtype.family_id >= AML_W1U) &&
-            (amlbt_transtype.interface != AML_INTF_USB))
-    {
-        q = set_rf;
-        UINT32_TO_STREAM(q, REG_PMU_POWER_CFG);  /* addr */
-        if (amlbt_rftype == AML_SINGLE_ANTENNA)
-        {
-            UINT32_TO_STREAM(q, (unsigned int)((0x1 << BIT_RF_NUM) | (amlbt_btsink << BT_SINK_MODE)));
-        }
-        else if (amlbt_rftype == AML_DOUBLE_ANTENNA)
-        {
-            UINT32_TO_STREAM(q, (unsigned int)((0x2 << BIT_RF_NUM) | (amlbt_btsink << BT_SINK_MODE)));
-        }
-        bt_sdio_fd = userial_vendor_uart_open();
-        write(bt_sdio_fd, set_rf, sizeof(set_rf));
-        if (size < 0)
-        {
-            close(bt_sdio_fd);
-            BTHWDBG("write failed!");
-        }
-    }
     UINT16_TO_STREAM(p, TCI_WRITE_REG);
     *p++ = 8;                       /* parameter length */
     UINT32_TO_STREAM(p, REG_PMU_POWER_CFG);  /* addr */
@@ -951,6 +945,39 @@ static uint8_t hw_config_set_rf_params(HC_BT_HDR *p_buf)
 
     retval = bt_vendor_cbacks->xmit_cb(TCI_WRITE_REG, \
                                        p_buf, hw_config_cback);
+
+    if ((amlbt_transtype.family_id >= AML_W1U) &&
+            (amlbt_transtype.interface != AML_INTF_USB))
+    {
+        q = set_rf;
+        UINT32_TO_STREAM(q, REG_PMU_POWER_CFG);  /* addr */
+        if (amlbt_rftype == AML_SINGLE_ANTENNA)
+        {
+            UINT32_TO_STREAM(q, (unsigned int)((0x1 << BIT_RF_NUM) | (amlbt_btsink << BT_SINK_MODE)));
+        }
+        else if (amlbt_rftype == AML_DOUBLE_ANTENNA)
+        {
+            UINT32_TO_STREAM(q, (unsigned int)((0x2 << BIT_RF_NUM) | (amlbt_btsink << BT_SINK_MODE)));
+        }
+        if (amlbt_transtype.interface == AML_INTF_PCIE)
+        {
+            bt_sdio_fd = userial_vendor_uart_open();
+            if (bt_sdio_fd < 0)
+            {
+                BTHWDBG("hw_config_set_rf_params open failed!");
+            }
+        }
+        size = write(bt_sdio_fd, set_rf, sizeof(set_rf));
+        if (size < 0)
+        {
+            BTHWDBG("write failed!");
+        }
+        if (bt_sdio_fd)
+        {
+            close(bt_sdio_fd);
+            bt_sdio_fd = 0;
+        }
+    }
 
     return (retval);
 }
@@ -1037,8 +1064,16 @@ static void hw_get_bin_size(void)
     len_iccm = hw_config_get_iccm_size();
     iccm_size = len_iccm;
 #endif
-    len_iccm -= 256 * 1024;
-    offset_iccm = 256 * 1024;
+    if (amlbt_transtype.family_id == AML_W2L)
+    {
+        len_iccm -= 384 * 1024;
+        offset_iccm = 384 * 1024;
+    }
+    else
+    {
+        len_iccm -= 256 * 1024;
+        offset_iccm = 256 * 1024;
+    }
 #ifdef AML_FW_FILE
     len_dccm = sizeof(BT_fwDCCM);
 #endif
@@ -1171,10 +1206,34 @@ static void hw_start_recovery(void)
 #endif
 }
 
-uint8_t hw_cfg_null(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
+uint8_t hw_cfg_write_fw_mode(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
 {
-    BTHWDBG("---------hw_cfg_null--------");
-    return FALSE;
+    uint8_t is_proceeding = FALSE;
+
+#ifdef UART_4M
+    userial_vendor_set_baud(\
+                            line_speed_to_userial_baud(4000000) \
+                           );
+#endif
+#ifdef UART_2M
+    userial_vendor_set_baud(\
+                            line_speed_to_userial_baud(2000000) \
+                           );
+#endif
+
+    UINT16_TO_STREAM(p, TCI_WRITE_REG);
+    *p++ = 8;
+
+    UINT32_TO_STREAM(p, REG_FW_MODE);
+    UINT32_TO_STREAM(p, amlbt_fw_mode); /*enable download event */
+
+    p_buf->len = HCI_CMD_PREAMBLE_SIZE + \
+                 8;
+    hw_cfg_cb.state = HW_CFG_AML_UPDATE_BAUDRATE_UART;
+
+    is_proceeding = bt_vendor_cbacks->xmit_cb(TCI_WRITE_REG, \
+                    p_buf, hw_config_cback);
+    return is_proceeding;
 }
 
 uint8_t hw_cfc_null_2(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
@@ -1418,6 +1477,8 @@ uint8_t hw_cfg_update_baudrate_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
     char tempBuf[8];
     int size = 0;
 
+    if (amlbt_transtype.family_id != AML_W2L)
+    {
 #ifdef UART_4M
         userial_vendor_set_baud(\
                                 line_speed_to_userial_baud(4000000) \
@@ -1428,6 +1489,7 @@ uint8_t hw_cfg_update_baudrate_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
                                 line_speed_to_userial_baud(2000000) \
                                );
 #endif
+    }
 
     if (amlbt_transtype.family_id == AML_UNKNOWN)
     {
@@ -1471,7 +1533,7 @@ uint8_t hw_cfg_update_baudrate_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
                 close(fw_fd);
                 return FALSE;
             }
-            read(fw_fd, p_dccm_buf, dccm_size);
+            size = read(fw_fd, p_dccm_buf, dccm_size);
             if (size < 0)
             {
                 ALOGE("In %s, Read dccm failed:%s", __FUNCTION__, strerror(errno));
@@ -1576,48 +1638,135 @@ uint8_t hw_cfg_download_firmware_test_2_uart(void *p_mem, HC_BT_HDR *p_buf, uint
     return is_proceeding;
 }
 
+
 uint8_t hw_cfg_download_firmware_iccm_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
 {
     uint8_t is_proceeding = FALSE;
     int i;
-
-    if (len_iccm <= 0)
+    unsigned char rsp[260];
+    unsigned char download_cmd[255] = {0};
+    uint8_t *p_dn = 0;
+    if (amlbt_transtype.interface == AML_INTF_SDIO)
     {
-        ALOGW(" iccm write over ");
-        hw_cfg_cb.state = HW_CFG_AML_DOWNLOAD_FIRMWARE_DCCM_UART;
-        cnt = 0;
-        return is_proceeding;
+        bt_sdio_fd = userial_vendor_uart_open();
+        if (bt_sdio_fd < 0)
+        {
+            BTHWDBG("hw_cfg_download_firmware_iccm_uart open failed!");
+            return FALSE;
+        }
     }
-    data_len_iccm = (len_iccm > RW_OPERATION_SIZE) ? RW_OPERATION_SIZE : len_iccm;
-    cmd_len_iccm = data_len_iccm + 4;		  // addr
-
-
-    UINT16_TO_STREAM(p, TCI_DOWNLOAD_BT_FW);
-    *p++ = cmd_len_iccm; /* parameter length */
-    UINT32_TO_STREAM(p, ICCM_RAM_BASE + offset_iccm);
-    for (i = 0; i < (int)data_len_iccm; i += 1)
+    if (amlbt_transtype.interface == AML_INTF_SDIO)
     {
-        p[i] = *(p_iccm_buf + offset_iccm + i);/* data */
+        while (len_iccm)
+        {
+            p_dn = &download_cmd[0];
+            data_len_iccm = (len_iccm > RW_OPERATION_SIZE) ? RW_OPERATION_SIZE : len_iccm;
+            cmd_len_iccm = data_len_iccm + 4;		  // addr
+            UINT16_TO_STREAM(p_dn, TCI_DOWNLOAD_BT_FW);
+            *p_dn++ = cmd_len_iccm; /* parameter length */
+            UINT32_TO_STREAM(p_dn, ICCM_RAM_BASE + offset_iccm);
+            for (i = 0; i < (int)data_len_iccm; i += 1)
+            {
+                //p_dn[i] = *(p_iccm_buf + offset_iccm + i);/* data */
+                download_cmd[7 + i] = *(p_iccm_buf + offset_iccm + i);
+            }
+            aml_hci_send_cmd_download(bt_sdio_fd, (unsigned char *)download_cmd, data_len_iccm + 7, (unsigned char *)rsp);
+            cnt++;
+            offset_iccm += data_len_iccm;
+            len_iccm -= data_len_iccm;
+
+        if (len_iccm <= 0)
+        {
+            BTHWDBG("iccm write over successfully %#x", cnt);
+            cnt = 0;
+        }
     }
 
-    p_buf->len = HCI_CMD_PREAMBLE_SIZE + \
-                 cmd_len_iccm;
-
-    is_proceeding = bt_vendor_cbacks->xmit_cb(TCI_DOWNLOAD_BT_FW, \
-                    p_buf, hw_config_cback);
-    cnt++;
-    offset_iccm += data_len_iccm;
-    len_iccm -= data_len_iccm;
-
-    if (len_iccm <= 0)
+    while (len_dccm)
     {
-        BTHWDBG("iccm write over successfully ");
-        hw_cfg_cb.state = HW_CFG_AML_DOWNLOAD_FIRMWARE_DCCM_UART;
-        cnt = 0;
+        p_dn = &download_cmd[0];
+        data_len_dccm = (len_dccm > RW_OPERATION_SIZE) ? RW_OPERATION_SIZE : len_dccm;
+        cmd_len_dccm = data_len_dccm + 4;
+        UINT16_TO_STREAM(p_dn, TCI_DOWNLOAD_BT_FW);
+        *p_dn++ = cmd_len_dccm;
+        UINT32_TO_STREAM(p_dn, DCCM_RAM_BASE + offset_dccm);
+        for (i = 0; i < (int)data_len_dccm; i += 1)
+        {
+            download_cmd[7 + i] = *(p_dccm_buf + offset_dccm + i);
+            //p_dn[i] = *(p_dccm_buf + offset_dccm + i);
+        }
+        aml_hci_send_cmd_download(bt_sdio_fd, (unsigned char *)download_cmd, data_len_dccm + 7, (unsigned char *)rsp);
+        cnt++;
+        offset_dccm += data_len_dccm;
+        len_dccm -= data_len_dccm;
+
+        if (len_dccm <= 0)
+        {
+            BTHWDBG("dccm write over successfully %#x", cnt);
+            cnt = 0;
+        }
+    }
+
+    UINT16_TO_STREAM(p, TCI_WRITE_REG);
+    *p++ = 8;
+    UINT32_TO_STREAM(p, 0xa70014);
+    UINT32_TO_STREAM(p, 0x0000000);
+
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE + \
+                     8;
+        hw_cfg_cb.state = HW_CFG_AML_CONFIG_RF_CALIBRATION;
+        free(p_iccm_buf);
+        free(p_dccm_buf);
+        if (fw_fd != -1)
+        {
+            close(fw_fd);
+            fw_fd = -1;
+        }
+        is_proceeding = bt_vendor_cbacks->xmit_cb(TCI_WRITE_REG, \
+                        p_buf, hw_config_cback);
+        BTHWDBG("HW_CFG_AML_DOWNLOAD_FIRMWARE_CLOSE_EVENT");
+    }
+    else
+    {
+        if (len_iccm <= 0)
+        {
+            ALOGW(" iccm write over ");
+            hw_cfg_cb.state = HW_CFG_AML_DOWNLOAD_FIRMWARE_DCCM_UART;
+            cnt = 0;
+            return is_proceeding;
+        }
+        data_len_iccm = (len_iccm > RW_OPERATION_SIZE) ? RW_OPERATION_SIZE : len_iccm;
+        cmd_len_iccm = data_len_iccm + 4;		  // addr
+
+
+        UINT16_TO_STREAM(p, TCI_DOWNLOAD_BT_FW);
+        *p++ = cmd_len_iccm; /* parameter length */
+        UINT32_TO_STREAM(p, ICCM_RAM_BASE + offset_iccm);
+        for (i = 0; i < (int)data_len_iccm; i += 1)
+        {
+            p[i] = *(p_iccm_buf + offset_iccm + i);/* data */
+        }
+
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE + \
+                     cmd_len_iccm;
+
+        is_proceeding = bt_vendor_cbacks->xmit_cb(TCI_DOWNLOAD_BT_FW, \
+                        p_buf, hw_config_cback);
+        cnt++;
+        offset_iccm += data_len_iccm;
+        len_iccm -= data_len_iccm;
+
+        if (len_iccm <= 0)
+        {
+            BTHWDBG("iccm write over successfully ");
+            hw_cfg_cb.state = HW_CFG_AML_DOWNLOAD_FIRMWARE_DCCM_UART;
+            cnt = 0;
+        }
     }
 
     return is_proceeding;
 }
+
 
 uint8_t hw_cfg_download_firmware_dccm_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
 {
@@ -1812,13 +1961,13 @@ void hw_cfg_set_rom_offset(int offset)
     }
 }
 
-
+#if 0
 int hw_cfg_rom_check_restore(void)
 {
     int fd = 0;
     int size = 0;
     int offset = 0;
-    char buffer[255] = { 0 };
+    char buffer[255] = {0};
     char *p_check = "RomCheck=\0";
     char *ptr;
 
@@ -1837,6 +1986,12 @@ int hw_cfg_rom_check_restore(void)
         return -1;
     }
     ptr = strstr(buffer, p_check);
+    if (ptr == NULL)
+    {
+        ALOGE("In %s, ptr is NULL", __FUNCTION__);
+        close(fd);
+        return -1;
+    }
     ptr++;
     offset = atoi(ptr);
     ALOGD("%s rom check offset %d", __FUNCTION__, offset);
@@ -1848,7 +2003,7 @@ void hw_cfg_rom_check_save(unsigned int offset)
 {
     int fd = 0;
     int size = 0;
-    char buffer[255] = { 0 };
+    char buffer[255] = {0};
     char *p_check = "RomCheck=\0";
     char *ptr;
 
@@ -1867,6 +2022,12 @@ void hw_cfg_rom_check_save(unsigned int offset)
         return;
     }
     ptr = strstr(buffer, p_check);
+    if (ptr == NULL)
+    {
+        ALOGE("In %s, ptr is NULL", __FUNCTION__);
+        close(fd);
+        return ;
+    }
     ptr++;
     sprintf(ptr, "%d", offset);
     size = write(fd, buffer, sizeof(buffer));
@@ -1880,7 +2041,7 @@ void hw_cfg_rom_check_save(unsigned int offset)
     ALOGD("%s rom check save offset %u", __FUNCTION__, offset);
     close(fd);
 }
-
+#endif
 uint8_t hw_cfg_download_firmware_test_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
 {
     uint8_t is_proceeding = FALSE;
@@ -2435,7 +2596,7 @@ void hw_config_start(void)
     if (p_buf)
     {
         //if (bt_start_config == 0)
-        if (((amlbt_transtype.interface == AML_INTF_USB && amlbt_transtype.family_id == AML_W2)
+        if (((amlbt_transtype.interface == AML_INTF_USB && amlbt_transtype.family_id >= AML_W2)
             && !download_hw) || (!bt_power || hw_state == 1))
         {
 
@@ -2462,8 +2623,14 @@ void hw_config_start(void)
 #endif
 
             p_buf->len = HCI_CMD_PREAMBLE_SIZE + 8;
-            hw_cfg_cb.state = HW_CFG_AML_UPDATE_BAUDRATE_UART;
-
+            if (amlbt_transtype.family_id == AML_W2L)
+            {
+                hw_cfg_cb.state = HW_CFG_AML_WRITE_FIRMWARE_MODE;
+            }
+            else
+            {
+                hw_cfg_cb.state = HW_CFG_AML_UPDATE_BAUDRATE_UART;
+            }
             is_proceeding = bt_vendor_cbacks->xmit_cb(TCI_UPDATE_UART_BAUDRATE,
                             p_buf, hw_config_cback);
         }
@@ -2480,7 +2647,7 @@ void hw_config_start(void)
                                     line_speed_to_userial_baud(2000000) \
                                    );
 #endif
-            if (amlbt_transtype.interface == AML_INTF_SDIO && amlbt_transtype.family_id == AML_W2)
+            if (amlbt_transtype.interface != AML_INTF_USB && amlbt_transtype.family_id == AML_W2)
             {
                 if (hw_state > HW_CFG_AML_DOWNLOAD_FIRMWARE_STRAT_CPU_UART || hw_state == 0) //reset
                 {
@@ -2540,7 +2707,7 @@ void hw_config_start(void)
                             close(fw_fd);
                             return ;
                         }
-                        read(fw_fd, p_dccm_buf, dccm_size);
+                        size = read(fw_fd, p_dccm_buf, dccm_size);
                         if (size < 0)
                         {
                             ALOGE("In %s, Read dccm failed:%s", __FUNCTION__, strerror(errno));
@@ -2590,7 +2757,7 @@ void hw_config_start(void)
                             close(fw_fd);
                             return ;
                         }
-                        read(fw_fd, p_dccm_buf, dccm_size);
+                        size = read(fw_fd, p_dccm_buf, dccm_size);
                         if (size < 0)
                         {
                             ALOGE("In %s, Read dccm failed:%s", __FUNCTION__, strerror(errno));
@@ -2694,9 +2861,13 @@ uint8_t hw_lpm_enable(uint8_t turn_on)
         }
 
         if (0 == *p)
+        {
             ALOGE("LPM disabled!!");
+        }
         else
+        {
             ALOGD("LPM enabled!!");
+        }
         if (!turn_on)
         {
             if (amlbt_transtype.interface == AML_INTF_USB)
@@ -3607,10 +3778,20 @@ void hw_le_scan_enable()
 }
 void hw_disbt_configure_cback(void *p_mem)
 {
+    char shutdwon_status[PROPERTY_VALUE_MAX];
     HC_BT_HDR *p_evt_buf = (HC_BT_HDR *)p_mem;
     uint8_t *rsp = (uint8_t *)p_evt_buf->data;
     BTHWDBG("read: %#x, %#x, %#x, %#x, %#x, %#x, %#x \n", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
-    state = REG_PUM_CLEAR;
+    property_get(PWR_PROP_NAME, shutdwon_status, "unknown");
+    if (strstr(shutdwon_status, "0userrequested") == NULL)
+    {
+        state = HW_REG_PUM_CLEAR;
+    }
+    else
+    {
+        state = HW_CLEAR_LIST;
+    }
+
     if (rsp[0] == 0x0e && rsp[1] == 0x04)
     {
         BTHWDBG("%s success!\n", __func__);
@@ -3715,4 +3896,104 @@ void hw_reg_pum_power_cfg_clear()
         BTHWDBG("%s send success!\n", __func__);
     }
 }
+
+void wifi_recovery_to_host()
+{
+    HC_BT_HDR *p_buf = NULL;
+    uint8_t *p;
+
+    if (bt_vendor_cbacks)
+    {
+        p_buf = (HC_BT_HDR *)bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + HCI_CMD_PREAMBLE_SIZE);
+    }
+    if (p_buf)
+    {
+        p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
+        p_buf->offset = 0;
+        p_buf->layer_specific = 0;
+        p = (uint8_t *)(p_buf + 1);
+        UINT16_TO_STREAM(p, HCI_RECOVERY_CMD);
+        *p = 0;
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE;
+
+        bt_vendor_cbacks->xmit_cb(HCI_RECOVERY_CMD, p_buf, NULL);
+    }
+}
+
+void aml_15p4_tx(unsigned char *data, unsigned short len)
+{
+    HC_BT_HDR *p_buf = NULL;
+    uint8_t *p;
+    uint8_t is_proceeding = FALSE;
+    static int num;
+    char *file = NULL;
+    hw_cfg_cb.state = 0;
+    hw_cfg_cb.fw_fd = -1;
+    hw_cfg_cb.f_set_baud_2 = FALSE;
+
+    if (bt_vendor_cbacks)
+    {
+        p_buf = (HC_BT_HDR *)bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + AML_15P4_CMD_BUF_SIZE);
+        if (p_buf)
+        {
+            p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
+            p_buf->offset = 0;
+            p_buf->layer_specific = 0;
+            p = (uint8_t *)(p_buf + 1);
+            memcpy(p, data, len);
+            p_buf->len = len;
+            bt_vendor_cbacks->xmit_cb(HCI_AML_15P4_CMD, p_buf, aml_15p4_data_cb);
+        }
+    }
+}
+void hw_poweroff_clear_list_cback(void *p_mem)
+{
+    HC_BT_HDR *p_evt_buf = (HC_BT_HDR *)p_mem;
+    uint8_t *rsp = (uint8_t *)p_evt_buf->data;
+    BTHWDBG("evt read: %#x, %#x, %#x, %#x, %#x, %#x, %#x \n", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
+    state = HW_RESET_CLOSE;
+    if (rsp[0] == 0x0e && rsp[5] == 0x00)
+    {
+        BTHWDBG("clear list cback success!\n");
+    }
+    else
+    {
+        BTHWDBG("clear list cback failed!\n");
+    }
+    if (bt_vendor_cbacks)
+    {
+        bt_vendor_cbacks->dealloc(p_evt_buf);
+    }
+}
+
+void hw_poweroff_clear_list()
+{
+    HC_BT_HDR *p_buf = NULL;
+    uint8_t *p;
+
+    if (bt_vendor_cbacks)
+    {
+        /* Must allocate command buffer via HC's alloc API */
+        p_buf = (HC_BT_HDR *)bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + \
+                HCI_CMD_PREAMBLE_SIZE);
+    }
+
+    if (p_buf)
+    {
+        p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
+        p_buf->offset = 0;
+        p_buf->layer_specific = 0;
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE;
+
+        p = (uint8_t *)(p_buf + 1);
+        UINT16_TO_STREAM(p, HCI_FW_CLEAR_LIST);
+        *p = 0; /* parameter length */
+
+        /* Send command via HC's xmit_cb API */
+        bt_vendor_cbacks->xmit_cb(HCI_FW_CLEAR_LIST, \
+                                    p_buf, hw_poweroff_clear_list_cback);
+        BTHWDBG("clear list send success!\n");
+    }
+}
+
 

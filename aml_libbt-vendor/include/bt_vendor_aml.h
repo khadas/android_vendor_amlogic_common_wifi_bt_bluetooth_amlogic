@@ -424,6 +424,7 @@
 #define HW_END_WITH_HCI_RESET    TRUE
 #endif
 
+
 typedef struct
 {
     unsigned short interface : 3;
@@ -456,6 +457,7 @@ enum {
     AML_W1,
     AML_W1U,
     AML_W2,
+    AML_W2L,
 };
 
 enum {
@@ -469,6 +471,9 @@ enum {
 };
 
 #define LOCAL_NAME_BUFFER_LEN                   32
+
+
+#define AML_15P4_CMD_BUF_SIZE 512
 
 /* h/w config control block */
 typedef struct

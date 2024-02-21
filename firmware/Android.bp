@@ -47,3 +47,17 @@ prebuilt_firmware {
     src: "w2_bt_fw_usb.bin",
 	proprietary: true,
 }
+
+prebuilt_firmware {
+    name: "w2l_bt_15p4_fw_uart.bin",
+
+    src: "w2l_bt_15p4_fw_uart.bin",
+	proprietary: true,
+}
+
+prebuilt_firmware {
+    name: "w2l_bt_15p4_fw_usb.bin",
+
+    src: "w2l_bt_15p4_fw_usb.bin",
+	proprietary: true,
+}

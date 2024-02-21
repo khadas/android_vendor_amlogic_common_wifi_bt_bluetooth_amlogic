@@ -53,14 +53,6 @@ int hw_set_patch_settlement_delay(char *p_conf_name, char *p_conf_value, int par
 #define CONF_DELIMITERS " =\n\r\t"
 #define CONF_VALUES_DELIMITERS "=\n\r\t"
 #define CONF_MAX_LINE_LEN 255
-#define AML_BT_CHIP_TYPE        4
-
-char *amlbt_rf_conf[AML_BT_CHIP_TYPE] = {
-    NULL,
-    "/vendor/etc/wifi/w1/aml_wifi_rf.txt",
-    "/vendor/etc/wifi/w1u/aml_wifi_rf.txt",
-    "/vendor/etc/wifi/w1u/aml_wifi_rf.txt",
-};
 
 typedef int (conf_action_t)(char *p_conf_name, char *p_conf_value, int param);
 
@@ -71,10 +63,11 @@ typedef struct {
 } conf_entry_t;
 
 unsigned int amlbt_poweron =AML_SDIO_EN;
-unsigned int amlbt_rftype =AML_DOUBLE_ANTENNA;
 unsigned int amlbt_chiptype =AML_W1U;
 unsigned int amlbt_btrecovery = 0;
 unsigned int amlbt_btsink = 0;
+unsigned int amlbt_rftype = 0;
+unsigned int amlbt_fw_mode = 0;
 
 /******************************************************************************
 **  Static variables
@@ -227,41 +220,15 @@ void load_aml_stack_conf()
             amlbt_btsink = strtol(aml_trim(split+1), &endptr, 0);
             ALOGE("%s amlbt_btsink '%d'", __func__, amlbt_btsink);
         }
-    }
-    fclose(fp);
-
-    // The BT RF num same sa WIFI
-    fp = fopen(amlbt_rf_conf[amlbt_transtype.family_id], "rt");
-    if (!fp) {
-      ALOGE("%s unable to open file '%s'", __func__,
-        (amlbt_rf_conf[amlbt_transtype.family_id]));
-      return;
-    }
-    ALOGE("%s success to open file '%s'", __func__,
-        (amlbt_rf_conf[amlbt_transtype.family_id]));
-    while (fgets(line, sizeof(line), fp)) {
-        char *line_ptr = aml_trim(line);
-        char line_f[100];
-        ++line_num;
-        // Skip blank and comment lines.
-        if (*line_ptr == '\0' || *line_ptr == '#' || *line_ptr == '[')
-          continue;
-
-        split = strchr(line_ptr, '=');
-        if (!split) {
-            ALOGE("%s no key/value separator found on line %d.", __func__, line_num);
-            continue;
-        }
-        strncpy(line_f,line_ptr,strlen(line_ptr)-strlen(split));
-        // *split = '\0';
-        ALOGE("%s  %s  %s", __func__, aml_trim(line_f), aml_trim(split+1));
-        char *endptr;
-        if (!strcmp(aml_trim(line_f), "rf_count")) {
+        else if (!strcmp(aml_trim(line_f), "BtAntenna")) {
             amlbt_rftype = strtol(aml_trim(split+1), &endptr, 0);
             ALOGE("%s amlbt_rftype '%d'", __func__, amlbt_rftype);
         }
+        else if (!strcmp(aml_trim(line_f), "FirmwareMode")) {
+            amlbt_fw_mode = strtol(aml_trim(split+1), &endptr, 0);
+            ALOGE("%s amlbt_fw_mode '%d'", __func__, amlbt_fw_mode);
+        }
     }
     fclose(fp);
-
 }
 
