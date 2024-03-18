@@ -42,7 +42,7 @@ static unsigned int dbg_credit = 8;
 static unsigned int dbg_cnt = 0;
 #endif
 
-#define AML_BT_VERSION  (0x20240204)
+#define AML_BT_VERSION  (0x20240304)
 
 #define BT_EP           (USB_EP2)
 
@@ -279,21 +279,15 @@ enum
     LOG_LEVEL_ALL,
 };
 
-//static int g_dbg_level = LOG_LEVEL_INFO;
-/*
+static int g_dbg_level = LOG_LEVEL_INFO;
+
 #define BTA(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_ALL) printk(KERN_INFO "BTA:" fmt, ## arg)
 #define BTD(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_DEBUG) printk(KERN_INFO "BTD:" fmt, ## arg)
 #define BTI(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_INFO) printk(KERN_INFO "BTI:" fmt, ## arg)
 #define BTW(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_WARN) printk(KERN_INFO "BTW:" fmt, ## arg)
 #define BTE(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_ERROR) printk(KERN_INFO "BTE:" fmt, ## arg)
 #define BTF(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_FATAL) printk(KERN_INFO "BTF:" fmt, ## arg)
-*/
-#define BTA(fmt, arg...)
-#define BTD(fmt, arg...)
-#define BTI(fmt, arg...)
-#define BTW(fmt, arg...)
-#define BTE(fmt, arg...)
-#define BTF(fmt, arg...)
+
 
 /*-----------------------------------------------W1U--------------------------------------------
 Tx Queue,     start:0x00938000, end:0x0093a01c, length:8224 bytes
@@ -492,18 +486,18 @@ static void amlbt_usb_write_word(unsigned int addr,unsigned int data, unsigned i
 {
     if (g_auc_hif_ops.hi_write_word_for_bt == NULL)
     {
-        printk("amlbt_usb_write_word NULL");
+        BTE("amlbt_usb_write_word NULL");
         return ;
     }
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("WW");
+        BTI("WW");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("WWE");
+        BTI("WWE");
     }
     USB_BEGIN_LOCK();
     g_auc_hif_ops.hi_write_word_for_bt(addr, data, ep);
@@ -514,13 +508,13 @@ static void amlbt_usb_write_word_ext(unsigned int addr,unsigned int data, unsign
 {
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("WW");
+        BTI("WW");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("WWE");
+        BTI("WWE");
     }
     g_auc_hif_ops.hi_write_word_for_bt(addr, data, ep);
 }
@@ -530,18 +524,18 @@ static unsigned int amlbt_usb_read_word(unsigned int addr, unsigned int ep)
     unsigned int value = 0;
     if (g_auc_hif_ops.hi_read_word_for_bt == NULL)
     {
-        printk("amlbt_usb_read_word NULL");
+        BTE("amlbt_usb_read_word NULL");
         return 0;
     }
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("RW");
+        BTI("RW");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("RWE");
+        BTI("RWE");
     }
     USB_BEGIN_LOCK();
     value = g_auc_hif_ops.hi_read_word_for_bt(addr, ep);
@@ -552,18 +546,18 @@ static void amlbt_usb_write_sram(unsigned char* buf, unsigned char* addr, unsign
 {
     if (g_auc_hif_ops.hi_write_sram_for_bt == NULL)
     {
-        printk("amlbt_usb_write_sram NULL");
+        BTE("amlbt_usb_write_sram NULL");
         return;
     }
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("WS");
+        BTI("WS");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("WSE");
+        BTI("WSE");
     }
     USB_BEGIN_LOCK();
     g_auc_hif_ops.hi_write_sram_for_bt(buf, addr, len, ep);
@@ -574,18 +568,18 @@ static void amlbt_usb_read_sram(unsigned char* buf, unsigned char* addr, unsigne
 {
     if (g_auc_hif_ops.hi_read_sram_for_bt == NULL)
     {
-        printk("hi_read_sram_for_bt NULL");
+        BTE("hi_read_sram_for_bt NULL");
         return;
     }
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("RS");
+        BTI("RS");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("RSE");
+        BTI("RSE");
     }
     USB_BEGIN_LOCK();
     g_auc_hif_ops.hi_read_sram_for_bt(buf, addr, len, ep);
@@ -597,18 +591,18 @@ static void amlbt_usb_read_sram_ext(unsigned char* buf, unsigned char* addr, uns
 {
     if (g_auc_hif_ops.hi_read_sram_for_bt == NULL)
     {
-        printk("hi_read_sram_for_bt NULL");
+        BTE("hi_read_sram_for_bt NULL");
         return;
     }
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("RS");
+        BTI("RS");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("RSE");
+        BTI("RSE");
     }
     g_auc_hif_ops.hi_read_sram_for_bt(buf, addr, len, ep);
 }
@@ -617,18 +611,18 @@ static void amlbt_usb_write_sram_ext(unsigned char* buf, unsigned char* addr, un
 {
     if (g_auc_hif_ops.hi_write_sram_for_bt == NULL)
     {
-        printk("hi_write_sram_for_bt NULL");
+        BTE("hi_write_sram_for_bt NULL");
         return;
     }
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
-        printk("WS");
+        BTI("WS");
         while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
-        printk("WSE");
+        BTI("WSE");
     }
     g_auc_hif_ops.hi_write_sram_for_bt(buf, addr, len, ep);
 }
@@ -658,7 +652,7 @@ static void rssi_dbg(void)
         tx_q_prio[4],tx_q_prio[5],tx_q_prio[6],tx_q_prio[7]);
     BTA("A %#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x\n", tx_q_index[0],tx_q_index[1],tx_q_index[2],tx_q_index[3],
         tx_q_index[4],tx_q_index[5],tx_q_index[6],tx_q_index[7]);
-    printk("S %#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x\n", tx_q_status[0],tx_q_status[1],tx_q_status[2],tx_q_status[3],
+    BTA("S %#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x\n", tx_q_status[0],tx_q_status[1],tx_q_status[2],tx_q_status[3],
         tx_q_status[4],tx_q_status[5],tx_q_status[6],tx_q_status[7]);
 
     amlbt_usb_read_sram(&bt_usb_data_buf[0], (unsigned char *)hci_rx_type_rd_ptr, USB_POLL_TOTAL_LEN, BT_EP);
@@ -680,10 +674,10 @@ static void aml_15p4_buff_init(void)
     if (_15p4_buf == NULL)
     {
         _15p4_buf = kzalloc(_15p4_rx_queue_size, GFP_DMA|GFP_ATOMIC);
-        printk("aml_15p4_buff_init:size %#x, b %#lx,\n", _15p4_rx_queue_size, (unsigned long)_15p4_buf);
+        BTI("aml_15p4_buff_init:size %#x, b %#lx,\n", _15p4_rx_queue_size, (unsigned long)_15p4_buf);
         if (_15p4_buf == NULL)
         {
-            printk("%s p_acl_buf kzalloc falied! \n", __func__);
+            BTE("%s p_acl_buf kzalloc falied! \n", __func__);
             return ;
         }
     }
@@ -696,7 +690,7 @@ void amlbt_buff_init(void)
         type = kzalloc(TYPE_FIFO_SIZE, GFP_DMA|GFP_ATOMIC);
         if (type == NULL)
         {
-            printk("%s type kzalloc falied! \n", __func__);
+            BTE("%s type kzalloc falied! \n", __func__);
             return ;
         }
     }
@@ -705,7 +699,7 @@ void amlbt_buff_init(void)
         p_acl_buf = kzalloc(HCI_MAX_FRAME_SIZE, GFP_DMA|GFP_ATOMIC);
         if (p_acl_buf == NULL)
         {
-            printk("%s p_acl_buf kzalloc falied! \n", __func__);
+            BTE("%s p_acl_buf kzalloc falied! \n", __func__);
             kfree(type);
             type = NULL;
             return ;
@@ -716,7 +710,7 @@ void amlbt_buff_init(void)
         g_fw_data_buf = kzalloc(DATA_FIFO_SIZE, GFP_DMA|GFP_ATOMIC);
         if (g_fw_data_buf == NULL)
         {
-            printk("%s g_fw_data_buf kzalloc falied! \n", __func__);
+            BTE("%s g_fw_data_buf kzalloc falied! \n", __func__);
             kfree(type);
             kfree(p_acl_buf);
             type = NULL;
@@ -729,7 +723,7 @@ void amlbt_buff_init(void)
         g_fw_evt_buf = kzalloc(EVT_FIFO_SIZE, GFP_DMA|GFP_ATOMIC);
         if (g_fw_evt_buf == NULL)
         {
-            printk("%s g_fw_evt_buf kzalloc falied! \n", __func__);
+            BTE("%s g_fw_evt_buf kzalloc falied! \n", __func__);
             kfree(type);
             kfree(p_acl_buf);
             kfree(g_fw_data_buf);
@@ -744,7 +738,7 @@ void amlbt_buff_init(void)
         g_lib_cmd_buff = kzalloc(CMD_FIFO_SIZE, GFP_DMA|GFP_ATOMIC);
         if (g_lib_cmd_buff == NULL)
         {
-            printk("%s g_lib_cmd_buff kzalloc falied! \n", __func__);
+            BTE("%s g_lib_cmd_buff kzalloc falied! \n", __func__);
             kfree(type);
             kfree(p_acl_buf);
             kfree(g_fw_data_buf);
@@ -769,7 +763,7 @@ void amlbt_buff_init(void)
 
         if (bt_usb_data_buf == NULL)
         {
-            printk("%s bt_usb_data_buf kzalloc falied! \n", __func__);
+            BTE("%s bt_usb_data_buf kzalloc falied! \n", __func__);
             kfree(type);
             kfree(p_acl_buf);
             kfree(g_fw_data_buf);
@@ -858,10 +852,10 @@ unsigned int gdsl_fifo_copy_data(gdsl_fifo_t *p_fifo, unsigned char *buff, unsig
 
     if (gdsl_fifo_remain(p_fifo) < len)
     {
-        printk("gdsl_fifo_copy_data no space!!\n");
-        printk("fifo->base_addr %#x, fifo->size %#x\n", (unsigned long)p_fifo->base_addr, p_fifo->size);
-        printk("fifo->w %#x, fifo->r %#x\n", (unsigned long)p_fifo->w, (unsigned long)p_fifo->r);
-        printk("remain %#x, len %#x\n", gdsl_fifo_remain(p_fifo), len);
+        BTE("gdsl_fifo_copy_data no space!!\n");
+        BTE("fifo->base_addr %#x, fifo->size %#x\n", (unsigned long)p_fifo->base_addr, p_fifo->size);
+        BTE("fifo->w %#x, fifo->r %#x\n", (unsigned long)p_fifo->w, (unsigned long)p_fifo->r);
+        BTE("remain %#x, len %#x\n", gdsl_fifo_remain(p_fifo), len);
         return 0;
     }
 
@@ -937,7 +931,7 @@ unsigned int gdsl_write_data_by_ep(gdsl_fifo_t *p_fifo, unsigned char *data, uns
     len = ((len + 3) & 0xFFFFFFFC);
     if (gdsl_fifo_remain(p_fifo) < len)
     {
-        printk("write data no space!!\n");
+        BTE("write data no space!!\n");
         return 0;
     }
 
@@ -1117,10 +1111,10 @@ void amlbt_usb_15p4_tx_fifo_init(void)
     {
         g_15p4_tx_fifo = gdsl_fifo_init(_15p4_tx_queue_size, (unsigned char *)(_15p4_tx_queue_addr));
         amlbt_usb_write_word(_15p4_tx_rd_ptr, (unsigned int)(unsigned long)g_15p4_tx_fifo->r, BT_EP);
-        printk("15.4 tx fifo init r: %#lx\n", (unsigned long)g_15p4_tx_fifo->r);
+        BTI("15.4 tx fifo init r: %#lx\n", (unsigned long)g_15p4_tx_fifo->r);
         //update write pointer
         amlbt_usb_write_word(_15p4_tx_wr_ptr, (unsigned int)(unsigned long)g_15p4_tx_fifo->w, BT_EP);
-        printk("15.4 tx fifo init w : %#lx\n", (unsigned long)g_15p4_tx_fifo->w);
+        BTI("15.4 tx fifo init w : %#lx\n", (unsigned long)g_15p4_tx_fifo->w);
     }
 }
 
@@ -1130,10 +1124,10 @@ void amlbt_usb_15p4_rx_fifo_init(void)
     {
         g_15p4_rx_fifo = gdsl_fifo_init(_15p4_rx_queue_size, (unsigned char *)(_15p4_rx_queue_addr));
         amlbt_usb_write_word(_15p4_rx_rd_ptr, (unsigned int)(unsigned long)g_15p4_rx_fifo->r, BT_EP);
-        printk("15.4 rx fifo init r: %#lx\n", (unsigned long)g_15p4_rx_fifo->r);
+        BTI("15.4 rx fifo init r: %#lx\n", (unsigned long)g_15p4_rx_fifo->r);
         //update write pointer
         amlbt_usb_write_word(_15p4_rx_wr_ptr, (unsigned int)(unsigned long)g_15p4_rx_fifo->w, BT_EP);
-        printk("15.4 rx fifo init w : %#lx\n", (unsigned long)g_15p4_rx_fifo->w);
+        BTI("15.4 rx fifo init w : %#lx\n", (unsigned long)g_15p4_rx_fifo->w);
     }
 }
 
@@ -1272,7 +1266,7 @@ static void amlbt_usb_send_hci_cmd(unsigned char *data, unsigned int len)
 
     if (g_cmd_fifo == NULL)
     {
-        printk("%s: bt_usb_hci_cmd_fifo NULL!!!!\n", __func__);
+        BTE("%s: bt_usb_hci_cmd_fifo NULL!!!!\n", __func__);
         return ;
     }
 
@@ -1320,7 +1314,7 @@ static void amlbt_usb_send_hci_data(unsigned char *data, unsigned int len)
         }
     }
 
-    printk("1:%#x,%#x,%d,%#x,%#x\n", acl_handle,len,dbg_credit,dbg_cnt,amlbt_usb_read_word(0x2f61c8, BT_EP));
+    BTI("1:%#x,%#x,%d,%#x,%#x\n", acl_handle,len,dbg_credit,dbg_cnt,amlbt_usb_read_word(0x2f61c8, BT_EP));
 #endif
     amlbt_usb_read_sram_ext((unsigned char *)tx_buff, (unsigned char *)g_tx_q[0].tx_q_prio_addr,
                                           sizeof(tx_buff), BT_EP);
@@ -1370,13 +1364,13 @@ static void amlbt_usb_send_hci_data(unsigned char *data, unsigned int len)
 
     if (i == USB_TX_Q_NUM)
     {
-        printk("%s: hci data space invalid!!!! \n", __func__);
+        BTE("%s: hci data space invalid!!!! \n", __func__);
         for (i = 0; i < USB_TX_Q_NUM; i++)
         {
-            printk("[%#x,%#x,%#x]", (unsigned int)g_tx_q[i].tx_q_prio,
+            BTI("[%#x,%#x,%#x]", (unsigned int)g_tx_q[i].tx_q_prio,
                     (unsigned int)g_tx_q[i].tx_q_dev_index,
                     (unsigned int)g_tx_q[i].tx_q_status);
-            printk("{%#x,%#x,%#x}", tx_q_prio[i], tx_q_index[i],tx_q_status[i]);
+            BTI("{%#x,%#x,%#x}", tx_q_prio[i], tx_q_index[i],tx_q_status[i]);
         }
         USB_END_LOCK();
         return ;
@@ -1401,7 +1395,7 @@ static void amlbt_usb_send_hci_data(unsigned char *data, unsigned int len)
     amlbt_usb_write_sram_ext((unsigned char *)&tx_buff[0], (unsigned char *)g_tx_q[i].tx_q_prio_addr,
                                       sizeof(unsigned int)*4, BT_EP);
 #ifdef BT_USB_DBG
-    printk("6:%d,%#x,%#x\n", i, g_tx_q[i].tx_q_prio, amlbt_usb_read_word(0x2f61c8, BT_EP));
+    BTI("6:%d,%#x,%#x\n", i, g_tx_q[i].tx_q_prio, amlbt_usb_read_word(0x2f61c8, BT_EP));
 #endif
     BTA("%s, Actual length:%d\n", __func__, len);
     USB_END_LOCK();
@@ -1409,11 +1403,11 @@ static void amlbt_usb_send_hci_data(unsigned char *data, unsigned int len)
 
 static void amlbt_usb_send_15p4_data(unsigned char *data, unsigned int len)
 {
-    printk("%s, len %d \n", __func__, len);
+    BTI("%s, len %d \n", __func__, len);
 
     if (g_15p4_tx_fifo == NULL)
     {
-        printk("%s: g_15p4_tx_fifo NULL!!!!\n", __func__);
+        BTE("%s: g_15p4_tx_fifo NULL!!!!\n", __func__);
         return ;
     }
 
@@ -1423,17 +1417,17 @@ static void amlbt_usb_send_15p4_data(unsigned char *data, unsigned int len)
     //step 1: Update the tx FIFO read pointer
     g_15p4_tx_fifo->r = (unsigned char *)(unsigned long)amlbt_usb_read_word(_15p4_tx_rd_ptr, BT_EP);
 
-    printk("15p4 tx r %#x\n", (unsigned long)g_15p4_tx_fifo->r);
+    BTI("15p4 tx r %#x\n", (unsigned long)g_15p4_tx_fifo->r);
     //step 2: Check the command FIFO space
 
     //step 3: Write HCI commands to WiFi SRAM
     gdsl_write_data_by_ep(g_15p4_tx_fifo, data, len, BT_EP);
 
     //step 4: Update the write pointer and write to WiFi SRAM
-    printk("15p4 before write:r:%#lx, w:%#lx\n", (unsigned long)g_15p4_tx_fifo->r, (unsigned long)g_15p4_tx_fifo->w);
+    BTI("15p4 before write:r:%#lx, w:%#lx\n", (unsigned long)g_15p4_tx_fifo->r, (unsigned long)g_15p4_tx_fifo->w);
 
     amlbt_usb_write_word(_15p4_tx_wr_ptr, (unsigned long)g_15p4_tx_fifo->w & 0x7ff, BT_EP);
-    printk("15p4 len %#x:w %#lx, r %#lx\n", len, (unsigned long)g_15p4_tx_fifo->w, (unsigned long)g_15p4_tx_fifo->r);
+    BTI("15p4 len %#x:w %#lx, r %#lx\n", len, (unsigned long)g_15p4_tx_fifo->w, (unsigned long)g_15p4_tx_fifo->r);
 }
 
 
@@ -1448,20 +1442,20 @@ static unsigned int amlbt_usb_recv_hci_event(unsigned char *buff, unsigned int c
 
     BTD("%s\n", __func__);
 #if AML_FW_POINTER
-    printk("evt r:%#lx,w:%#lx\n", (unsigned long)g_event_fifo->r - hci_evt_fifo_addr, (unsigned long)g_event_fifo->w - hci_evt_fifo_addr);
+    BTI("evt r:%#lx,w:%#lx\n", (unsigned long)g_event_fifo->r - hci_evt_fifo_addr, (unsigned long)g_event_fifo->w - hci_evt_fifo_addr);
 #endif
     if (g_event_fifo->w != g_event_fifo->r)
     {
         len = gdsl_read_data_by_ep(g_event_fifo, buff, cnt, BT_EP);
     }
 #if AML_FW_POINTER
-    printk("read event fifo len %d\n", len);
+    BTI("read event fifo len %d\n", len);
     if (len)
     {
-        printk("event data:\n");
+        BTI("event data:\n");
         for (; i < len; i++)
         {
-            printk(KERN_CONT "%#x|", buff[i]);
+            BTI(KERN_CONT "%#x|", buff[i]);
         }
     }
 #endif
@@ -1482,13 +1476,13 @@ static unsigned int amlbt_usb_recv_rx_type(unsigned char *buff, unsigned int cnt
         len = gdsl_read_data_by_ep(g_rx_type_fifo, buff, cnt, BT_EP);
     }
 #if AML_FW_POINTER
-    printk("read rx type fifo len %d\n", len);
+    BTE("read rx type fifo len %d\n", len);
     if (len)
     {
-        printk("rx type data:\n");
+        BTE("rx type data:\n");
         for (; i < len; i++)
         {
-            printk(KERN_CONT "%#x|", buff[i]);
+            BTE(KERN_CONT "%#x|", buff[i]);
         }
     }
 #endif
@@ -1509,13 +1503,13 @@ static unsigned int amlbt_usb_recv_data_index(unsigned char *buff, unsigned int 
         len = gdsl_read_data_by_ep(g_rx_fifo, buff, cnt, BT_EP);
     }
 #if AML_FW_POINTER
-    printk("read rx data index len %d\n", len);
+    BTE("read rx data index len %d\n", len);
     if (len)
     {
-        printk("rx data index data:\n");
+        BTE("rx data index data:\n");
         for (; i < len; i++)
         {
-            printk(KERN_CONT "%#x|", buff[i]);
+            BTE(KERN_CONT "%#x|", buff[i]);
         }
     }
 #endif
@@ -1559,7 +1553,7 @@ void amlbt_usb_fifo_init(void)
     if (FAMILY_TYPE_IS_W2L(amlbt_if_type))
     {
         g_15p4_rx_local_fifo = gdsl_fifo_init(_15p4_rx_queue_size, _15p4_buf);
-        printk("amlbt_usb_fifo_init1:w %#lx, r %#lx, b %#lx,\n", (unsigned long)g_15p4_rx_local_fifo->w,
+        BTI("amlbt_usb_fifo_init1:w %#lx, r %#lx, b %#lx,\n", (unsigned long)g_15p4_rx_local_fifo->w,
                     (unsigned long)g_15p4_rx_local_fifo->r, (unsigned long)_15p4_buf);
     }
     st_reg &= ~(WF_SRAM_FD_INIT_FLAG);
@@ -1570,7 +1564,7 @@ void amlbt_usb_fifo_init(void)
 
     if (FAMILY_TYPE_IS_W2L(amlbt_if_type))
     {
-        printk("amlbt_usb_fifo_init:w %#lx, r %#lx, b %#lx,\n", (unsigned long)g_15p4_rx_local_fifo->w,
+        BTI("amlbt_usb_fifo_init:w %#lx, r %#lx, b %#lx,\n", (unsigned long)g_15p4_rx_local_fifo->w,
                     (unsigned long)g_15p4_rx_local_fifo->r, (unsigned long)g_15p4_rx_local_fifo->base_addr);
     }
 }
@@ -1664,8 +1658,8 @@ void amlbt_usb_firmware_check(void)
         iccm_base_addr += 4;
         if (st_reg != *p_check)
         {
-            printk("iccm download data:%#x, raw data:%#x\n", st_reg, *p_check);
-            printk("iccm no match, offset = %#x!\n", offset);
+            BTI("iccm download data:%#x, raw data:%#x\n", st_reg, *p_check);
+            BTI("iccm no match, offset = %#x!\n", offset);
             break;
         }
         p_check++;
@@ -1690,8 +1684,8 @@ void amlbt_usb_firmware_check(void)
         dccm_base_addr += 4;
         if (st_reg != *p_check)
         {
-            printk("dccm download data:%#x, raw data:%#x\n", st_reg, *p_check);
-            printk("dccm no match!\n");
+            BTI("dccm download data:%#x, raw data:%#x\n", st_reg, *p_check);
+            BTI("dccm no match!\n");
             break;
         }
         p_check++;
@@ -1756,7 +1750,7 @@ void amlbt_usb_download_firmware(void)
     download_size = fw_iccmLen;
 
     //to do download bt fw
-    printk("bt_usb_download_firmware:iccm size %#x\n", download_size);
+    BTI("bt_usb_download_firmware:iccm size %#x\n", download_size);
     //g_auc_hif_ops.bt_hi_write_word(0xf03050, 1);    //ram power down rg_ram_pd_shutdown_sw
     //g_auc_hif_ops.bt_hi_write_word(REG_DEV_RESET, 0);    //pmu down
 
@@ -1788,7 +1782,7 @@ void amlbt_usb_download_firmware(void)
     download_size = fw_dccmLen;
 
     //to do download bt fw
-    //printk("bt_usb_download_firmware:dccm size %#x\n", download_size);
+    //BTI("bt_usb_download_firmware:dccm size %#x\n", download_size);
     offset = 0;
     remain_len = download_size;
     while (offset < download_size)
@@ -1807,7 +1801,7 @@ void amlbt_usb_download_firmware(void)
             dccm_base_addr += USB_DOWNLOAD_LEN;
         }
 
-        printk("bt_usb_download_firmware dccm remain_len %#x \n", remain_len);
+        BTI("bt_usb_download_firmware dccm remain_len %#x \n", remain_len);
     }
     //amlbt_usb_firmware_check();
 }
@@ -1815,7 +1809,7 @@ void amlbt_usb_download_firmware(void)
 static int amlbt_usb_char_open(struct inode *inode_p, struct file *file_p)
 {
     int rf_num= 0;
-    printk("%s, %#x, %#x, %#x\n", __func__, download_fw, bt_recovery, AML_BT_VERSION);
+    BTI("%s, %#x, %#x, %#x\n", __func__, download_fw, bt_recovery, AML_BT_VERSION);
     close_state = 0;
 
     amlbt_usb_ram_init();
@@ -1849,7 +1843,7 @@ static int amlbt_usb_char_open(struct inode *inode_p, struct file *file_p)
         }
     }
     rf_num = ((amlbt_usb_read_word(REG_PMU_POWER_CFG, BT_EP) >> BIT_RF_NUM) & 0x03);
-    printk("%s set rf num %#x", __func__, rf_num);
+    BTI("%s set rf num %#x", __func__, rf_num);
     init_completion(&usb_completion);
     return nonseekable_open(inode_p, file_p);
 }
@@ -1857,11 +1851,11 @@ static void amlbt_usb_char_deinit(void);
 
 static int amlbt_usb_char_close(struct inode *inode_p, struct file *file_p)
 {
-    printk("%s $$$$$$$$$$$$$$$$$$$$$$$$$$$$ %#x, %#x\n", __func__, download_fw, bt_recovery);
+    BTI("%s $$$$$$$$$$$$$$$$$$$$$$$$$$$$ %#x, %#x\n", __func__, download_fw, bt_recovery);
 
     if (g_event_fifo != 0)
     {
-        printk("event w:%p,r:%p\n", g_event_fifo->w, g_event_fifo->r);
+        BTI("event w:%p,r:%p\n", g_event_fifo->w, g_event_fifo->r);
     }
 
     if (download_fw)
@@ -1950,7 +1944,7 @@ static ssize_t amlbt_usb_char_read_fw(struct file *file_p,
                 download_flag = 1;
                 fw_cmd_r = 0;
                 fw_cmd_w = 0;
-                printk("%s end \n", __func__);
+                BTI("%s end \n", __func__);
             }
         }
         break;
@@ -2103,11 +2097,11 @@ static int amlbt_usb_get_data(void)
     type_size = gdsl_fifo_get_data(&read_fifo, type_buff, sizeof(type_buff));
     if (type_buff[0] != 0x2 && type_buff[0] != 0x4 && type_buff[0] != 0x10)
     {
-        printk("%s g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTE("%s g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
         g_event_fifo->w = (unsigned char *)(unsigned long)((bt_usb_data_buf[39]<<24)|(bt_usb_data_buf[38]<<16)|(bt_usb_data_buf[37]<<8)|bt_usb_data_buf[36]);
-        printk("%s g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
+        BTE("%s g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
         g_rx_fifo->w = (unsigned char *)(unsigned long)((bt_usb_data_buf[31]<<24)|(bt_usb_data_buf[30]<<16)|(bt_usb_data_buf[29]<<8)|bt_usb_data_buf[28]);
-        printk("%s g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
+        BTE("%s g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
     }
     BTD("type fifo:w %#lx, r %#lx\n", (unsigned long)g_rx_type_fifo->w, (unsigned long)g_rx_type_fifo->r);
     if (type_size)
@@ -2188,17 +2182,17 @@ static int amlbt_usb_get_data(void)
             read_fifo.w = g_15p4_rx_fifo->w;
             read_fifo.size = _15p4_rx_queue_size;
             _15p4_size = gdsl_fifo_get_data(&read_fifo, &fw_read_buff[_15p4_rx_queue_size], _15p4_rx_queue_size);
-            printk("15.4 get size %d\n", _15p4_size);
-            printk("15.4 rx:w %#lx, r %#lx\n", (unsigned long)g_15p4_rx_fifo->w, (unsigned long)g_15p4_rx_fifo->r);
+            BTI("15.4 get size %d\n", _15p4_size);
+            BTI("15.4 rx:w %#lx, r %#lx\n", (unsigned long)g_15p4_rx_fifo->w, (unsigned long)g_15p4_rx_fifo->r);
             if (_15p4_size)
             {
                 g_15p4_rx_fifo->r = read_fifo.r;
-                printk("15.4 copy:w %#lx, r %#lx, b %#lx,\n", (unsigned long)g_15p4_rx_local_fifo->w,
+                BTI("15.4 copy:w %#lx, r %#lx, b %#lx,\n", (unsigned long)g_15p4_rx_local_fifo->w,
                     (unsigned long)g_15p4_rx_local_fifo->r, (unsigned long)g_15p4_rx_local_fifo->base_addr);
                 gdsl_fifo_copy_data(g_15p4_rx_local_fifo, &fw_read_buff[_15p4_rx_queue_size], _15p4_size);
                 reg = (((unsigned int)(unsigned long)read_fifo.r) & 0x7ff);
                 amlbt_usb_write_word(_15p4_rx_rd_ptr, reg, BT_EP);
-                printk("15.4 update rx rd %#x\n", amlbt_usb_read_word(_15p4_rx_rd_ptr, BT_EP));
+                BTI("15.4 update rx rd %#x\n", amlbt_usb_read_word(_15p4_rx_rd_ptr, BT_EP));
             }
         }
     }
@@ -2218,14 +2212,14 @@ int amlbt_usb_check_fw_rx(void *data)
     {
         if (close_state)
         {
-            printk("%s R CLOSE\n", __func__);
+            BTI("%s R CLOSE\n", __func__);
             check_fw_rx_stask = NULL;
             break;
         }
         if (bt_recovery)
         {
             wake_up_interruptible(&poll_amlbt_queue);
-            printk("%s R CLOSE\n", __func__);
+            BTI("%s R CLOSE\n", __func__);
             check_fw_rx_stask = NULL;
             break;
         }
@@ -2234,7 +2228,7 @@ int amlbt_usb_check_fw_rx(void *data)
             usleep_range(20000, 20000);
             if (close_state)
             {
-                printk("%s R1 CLOSE\n", __func__);
+                BTI("%s R1 CLOSE\n", __func__);
                 check_fw_rx_stask = NULL;
                 break;
             }
@@ -2262,7 +2256,7 @@ int amlbt_usb_check_fw_rx(void *data)
                     break;
                 }
                 fw_type = gdsl_fifo_used(g_fw_type_fifo);
-                //printk("[%#x, %#x, %#x, %#x]\n", bt_rd_ptr, bt_wt_ptr, now, last);
+                //BTI("[%#x, %#x, %#x, %#x]\n", bt_rd_ptr, bt_wt_ptr, now, last);
                 if (fw_type)
                 {
                     BTD("%s fw_type %#x\n", __func__, fw_type);
@@ -2282,7 +2276,7 @@ int amlbt_usb_check_fw_rx(void *data)
             }
         }
     }
-    printk("%s exit read fw rx thread\n", __func__);
+    BTI("%s exit read fw rx thread\n", __func__);
     return 0;
 }
 
@@ -2292,7 +2286,7 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                                    loff_t *pos_p)
 {
     unsigned char close_evt[7] = {0x04, 0x0e, 0x04, 0x01, 0x27, 0xfc, 0x00};
-    static unsigned char host_read_buff[USB_TX_Q_LEN] = {0};
+    static unsigned char host_read_buff[USB_TX_Q_LEN+64] = {0};
     static unsigned char bt_type[4] = {0};
     unsigned int read_len = 0;
 
@@ -2318,19 +2312,19 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
             BTD("tp(%#x,%#x,%#x,%#x)\n", bt_type[0],bt_type[1],bt_type[2],bt_type[3]);
             if (bt_type[0] != 0x4 && bt_type[0] != 0x2 && bt_type[0] != 0x10)
             {
-                printk("TYPE ERROR(%#x,%#x,%#x,%#x)\n", bt_type[0],bt_type[1],bt_type[2],bt_type[3]);
-                printk("g_fw_type_fifo->w:%#x g_fw_type_fifo->r:%#x\n", g_fw_type_fifo->w, g_fw_type_fifo->r);
+                BTE("TYPE ERROR(%#x,%#x,%#x,%#x)\n", bt_type[0],bt_type[1],bt_type[2],bt_type[3]);
+                BTE("g_fw_type_fifo->w:%#x g_fw_type_fifo->r:%#x\n", g_fw_type_fifo->w, g_fw_type_fifo->r);
                 if (FAMILY_TYPE_IS_W2L(amlbt_if_type))
                 {
-                    printk("g_15p4_rx_local_fifo->w:%#x g_15p4_rx_local_fifo->r:%#x\n", g_15p4_rx_local_fifo->w, g_15p4_rx_local_fifo->r);
+                    BTE("g_15p4_rx_local_fifo->w:%#x g_15p4_rx_local_fifo->r:%#x\n", g_15p4_rx_local_fifo->w, g_15p4_rx_local_fifo->r);
                 }
-                printk("g_fw_evt_fifo->w:%#x g_fw_evt_fifo->r:%#x\n", g_fw_evt_fifo->w, g_fw_evt_fifo->r);
-                printk("g_fw_data_fifo->w:%#x g_fw_data_fifo->r:%#x\n", g_fw_data_fifo->w, g_fw_data_fifo->r);
+                BTE("g_fw_evt_fifo->w:%#x g_fw_evt_fifo->r:%#x\n", g_fw_evt_fifo->w, g_fw_evt_fifo->r);
+                BTE("g_fw_data_fifo->w:%#x g_fw_data_fifo->r:%#x\n", g_fw_data_fifo->w, g_fw_data_fifo->r);
                 return -EFAULT;
             }
             if (copy_to_user(buf_p, bt_type, count))
             {
-                printk("%s, copy_to_user error \n", __func__);
+                BTE("%s, copy_to_user error \n", __func__);
                 return -EFAULT;
             }
         break;
@@ -2340,10 +2334,10 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
             {
                 if (close_state)
                 {
-                    printk("%s R3 CLOSE\n", __func__);
+                    BTI("%s R3 CLOSE\n", __func__);
                     if (copy_to_user(buf_p, &close_evt[1], count))
                     {
-                        printk("%s, copy_to_user error \n", __func__);
+                        BTE("%s, copy_to_user error \n", __func__);
                         return -EFAULT;
                     }
                     return count;
@@ -2351,7 +2345,7 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                 gdsl_fifo_get_data(g_fw_evt_fifo, host_read_buff, 4);
                 if (copy_to_user(buf_p, &host_read_buff[1], count))
                 {
-                    printk("%s, copy_to_user error \n", __func__);
+                    BTE("%s, copy_to_user error \n", __func__);
                     return -EFAULT;
                 }
                 BTD("E:%#x|%#x|%#x|%#x\n", host_read_buff[0], host_read_buff[1],
@@ -2364,7 +2358,7 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                        host_read_buff[2], host_read_buff[3]);
                 if (copy_to_user(buf_p, &host_read_buff[4], count))
                 {
-                    printk("%s, copy_to_user error \n", __func__);
+                    BTE("%s, copy_to_user error \n", __func__);
                     return -EFAULT;
                 }
             }
@@ -2373,13 +2367,13 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                 gdsl_fifo_get_data(g_15p4_rx_local_fifo, host_read_buff, 5);
                 read_len = ((7 + ((host_read_buff[4] << 8) | (host_read_buff[3])) + 3) & 0xFFFFFFFC);
                 gdsl_fifo_get_data(g_15p4_rx_local_fifo, &host_read_buff[5], read_len - 5);
-                printk("15.4 read len %d\n", read_len);
-                printk("15.4 header:%#x|%#x|%#x|%#x|%#x\n", host_read_buff[0], host_read_buff[1],
+                BTI("15.4 read len %d\n", read_len);
+                BTI("15.4 header:%#x|%#x|%#x|%#x|%#x\n", host_read_buff[0], host_read_buff[1],
                        host_read_buff[2], host_read_buff[3], host_read_buff[4]);
-                printk("15.4 local:w %#lx, r %#lx\n", (unsigned long)g_15p4_rx_local_fifo->w, (unsigned long)g_15p4_rx_local_fifo->r);
+                BTI("15.4 local:w %#lx, r %#lx\n", (unsigned long)g_15p4_rx_local_fifo->w, (unsigned long)g_15p4_rx_local_fifo->r);
                 if (copy_to_user(buf_p, &host_read_buff[1], count))
                 {
-                    printk("%s, copy_to_user error \n", __func__);
+                    BTE("%s, copy_to_user error \n", __func__);
                     return -EFAULT;
                 }
             }
@@ -2397,24 +2391,24 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                        host_read_buff[6], host_read_buff[7]);
                 if (close_state)
                 {
-                    printk("%s R4 CLOSE\n", __func__);
+                    BTI("%s R4 CLOSE\n", __func__);
                     if (copy_to_user(buf_p, &close_evt[3], count))
                     {
-                        printk("%s, copy_to_user error \n", __func__);
+                        BTE("%s, copy_to_user error \n", __func__);
                         return -EFAULT;
                     }
                     return count;
                 }
                 if (copy_to_user(buf_p, &host_read_buff[3], count))
                 {
-                    printk("%s, copy_to_user error \n", __func__);
+                    BTE("%s, copy_to_user error \n", __func__);
                     return -EFAULT;
                 }
 #ifdef BT_USB_DBG
                 if (host_read_buff[1] == 0x13 && host_read_buff[4] == dbg_handle)
                 {
                     dbg_credit++;
-                    printk("N:%d,%#x\n", dbg_credit,amlbt_usb_read_word(0x2f61c8, BT_EP));
+                    BTI("N:%d,%#x\n", dbg_credit,amlbt_usb_read_word(0x2f61c8, BT_EP));
                 }
 #endif
             }
@@ -2428,7 +2422,7 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                        host_read_buff[9], host_read_buff[10], host_read_buff[11]);
                 if (copy_to_user(buf_p, &host_read_buff[8], count))
                 {
-                    printk("%s, copy_to_user error \n", __func__);
+                    BTE("%s, copy_to_user error \n", __func__);
                     return -EFAULT;
                 }
             }
@@ -2437,24 +2431,24 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                 //read_len = ((host_read_buff[4] << 8) | (host_read_buff[3])) + 2;
                 //read_len -= 1;
                 //read_len = ((read_len + 3) & 0xFFFFFFFC);
-                printk("15.4 read payload len %d\n", count);
+                BTI("15.4 read payload len %d\n", count);
                 //gdsl_fifo_get_data(g_15p4_rx_local_fifo, &host_read_buff[5], count);
 
-                printk("15.4 payload:[%#x|%#x|%#x|%#x|%#x|%#x|%#x|%#x]\n", host_read_buff[5], host_read_buff[6],
+                BTI("15.4 payload:[%#x|%#x|%#x|%#x|%#x|%#x|%#x|%#x]\n", host_read_buff[5], host_read_buff[6],
                        host_read_buff[7], host_read_buff[8]);
 
-                printk("15.4 get:w %#lx, r %#lx\n", (unsigned long)g_15p4_rx_local_fifo->w, (unsigned long)g_15p4_rx_local_fifo->r);
-                printk("type:w %#lx, r %#lx\n", (unsigned long)g_fw_type_fifo->w, (unsigned long)g_fw_type_fifo->r);
+                BTI("15.4 get:w %#lx, r %#lx\n", (unsigned long)g_15p4_rx_local_fifo->w, (unsigned long)g_15p4_rx_local_fifo->r);
+                BTI("type:w %#lx, r %#lx\n", (unsigned long)g_fw_type_fifo->w, (unsigned long)g_fw_type_fifo->r);
 
                 if (copy_to_user(buf_p, &host_read_buff[5], count))
                 {
-                    printk("%s, copy_to_user error \n", __func__);
+                    BTE("%s, copy_to_user error \n", __func__);
                     return -EFAULT;
                 }
             }
             break;
         default:
-            printk("%s, evt_state error!!\n", __func__);
+            BTE("%s, evt_state error!!\n", __func__);
             break;
     }
     return count;
@@ -2483,7 +2477,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
 
     if (copy_from_user(p_acl_buf, buf_p, count))
     {
-        printk("%s: Failed to get data from user space\n", __func__);
+        BTE("%s: Failed to get data from user space\n", __func__);
         return -EFAULT;
     }
 
@@ -2498,12 +2492,12 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
 
     if (n == size)
     {
-        printk("CMD_I:%#x\n", cmd_index);
+        BTE("CMD_I:%#x\n", cmd_index);
         for (n = 0; n < 11; n++)
         {
-            printk("%#x|", p_acl_buf[n]);
+            BTE("%#x|", p_acl_buf[n]);
         }
-        printk("---------------cmd error!------------");
+        BTE("---------------cmd error!------------");
         return -EINVAL;
     }
 
@@ -2536,7 +2530,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
 
             if (BT_fwICCM == NULL || BT_fwDCCM == NULL)
             {
-                printk("amlbt_usb_char_write_fw vmalloc err!!\n");
+                BTE("amlbt_usb_char_write_fw vmalloc err!!\n");
                 if (BT_fwICCM != NULL)
                 {
                     vfree(BT_fwICCM);
@@ -2572,20 +2566,20 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
     {
         offset = ((p_acl_buf[6] << 24) | (p_acl_buf[5] << 16) | (p_acl_buf[4] << 8) | p_acl_buf[3]);
         reg_value = ((p_acl_buf[10] << 24) | (p_acl_buf[9] << 16) | (p_acl_buf[8] << 8) | p_acl_buf[7]);
-        printk("WR:%#x,%#x\n", offset, reg_value);
+        BTI("WR:%#x,%#x\n", offset, reg_value);
         if (offset == 0xa70014 && !(reg_value & (1 << 24))) //rf calibration
         {
             //amlbt_usb_firmware_check();
             if (!download_flag)
             {
                 amlbt_usb_download_firmware();
-                printk("download finished!\n");
+                BTI("download finished!\n");
                 vfree(BT_fwICCM);
                 vfree(BT_fwDCCM);
                 BT_fwICCM = NULL;
                 BT_fwDCCM = NULL;
             }
-            printk("W E %#x,%#x\n", iccm_base_addr, dccm_base_addr);
+            BTI("W E %#x,%#x\n", iccm_base_addr, dccm_base_addr);
         }
         else if (offset == REG_PMU_POWER_CFG)
         {
@@ -2602,7 +2596,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
             if ((g_auc_hif_ops.hi_write_word_for_bt == NULL) || (g_auc_hif_ops.hi_read_word_for_bt == NULL) ||
             (g_auc_hif_ops.hi_write_sram_for_bt == NULL) || (g_auc_hif_ops.hi_read_sram_for_bt == NULL))
             {
-                printk("USB Interface NULL");
+                BTE("USB Interface NULL");
             }
             else
             {
@@ -2611,7 +2605,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
                 //Generic Process
                 amlbt_usb_write_word(REG_DEV_RESET, (unsigned int)((BIT_CPU | BIT_MAC | BIT_PHY) << DEV_RESET_SW),
                                                BT_EP);
-                printk("%s end 19:30,bt reg : %#x\n", __func__, amlbt_usb_read_word(REG_DEV_RESET, BT_EP));
+                BTI("%s end 19:30,bt reg : %#x\n", __func__, amlbt_usb_read_word(REG_DEV_RESET, BT_EP));
             }
         }
     }
@@ -2625,7 +2619,7 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
     else if (p_acl_buf[0] == 0x1a && p_acl_buf[1] == 0xfc)  //HCI_VSC_WRITE_BD_ADDR
     {
         memcpy(bt_addr, &p_acl_buf[3], sizeof(bt_addr));
-        printk("ADDR:[%#x|%#x|%#x|%#x|%#x|%#x]",
+        BTI("ADDR:[%#x|%#x|%#x|%#x|%#x|%#x]",
                bt_addr[0], bt_addr[1], bt_addr[2], bt_addr[3], bt_addr[4], bt_addr[5]);
         download_end = 1;
     }
@@ -2647,7 +2641,7 @@ static ssize_t amlbt_usb_char_write(struct file *file_p,
 
     if (count > HCI_MAX_FRAME_SIZE)
     {
-        printk("count > HCI_MAX_FRAME_SIZE %d, %d\n", count, HCI_MAX_FRAME_SIZE);
+        BTE("count > HCI_MAX_FRAME_SIZE %d, %d\n", count, HCI_MAX_FRAME_SIZE);
         return -EINVAL;
     }
 
@@ -2664,7 +2658,7 @@ static ssize_t amlbt_usb_char_write(struct file *file_p,
 
     if (copy_from_user(p_acl_buf, buf_p, count))
     {
-        printk("%s: Failed to get data from user space\n", __func__);
+        BTE("%s: Failed to get data from user space\n", __func__);
         //mutex_unlock(&usb_rw_lock);
         return -EFAULT;
     }
@@ -2683,16 +2677,16 @@ static ssize_t amlbt_usb_char_write(struct file *file_p,
         {
             for (i = 0; i < 8; i++)
             {
-                printk("%#x|", p_acl_buf[i]);
+                BTI("%#x|", p_acl_buf[i]);
             }
-            printk("W CLOSE\n");
+            BTI("W CLOSE\n");
             //mutex_unlock(&usb_rw_lock);
             close_state = 1;
             return count;
         }
         if (p_acl_buf[0] == 0x05 && p_acl_buf[1] == 0x14)     // read rssi
         {
-            printk("rs\n");
+            BTI("rs\n");
 #ifdef BT_USB_DBG
             rssi_dbg();
 #endif
@@ -2766,20 +2760,20 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
         {
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_BT_COEX_TIME copy error\n");
+                BTE("IOCTL_SET_BT_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_BT_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_SET_BT_COEX_TIME %#x\n", coex_time);
             if (INTF_TYPE_IS_SDIO(amlbt_if_type))
             {
                 reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A57);
-                printk("w RG_AON_A57 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A57 %#x %#x", reg_value, coex_time);
                 g_hif_sdio_ops.bt_hi_write_word(RG_AON_A57, coex_time);
             }
             if (INTF_TYPE_IS_PCIE(amlbt_if_type))
             {
                 reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A57);
-                printk("w RG_AON_A57 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A57 %#x %#x", reg_value, coex_time);
                 aml_pci_write_for_bt(coex_time, AML_ADDR_AON, RG_AON_A57);
             }
         }
@@ -2788,20 +2782,20 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
         {
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_WIFI_COEX_TIME copy error\n");
+                BTE("IOCTL_SET_WIFI_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_WIFI_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_SET_WIFI_COEX_TIME %#x\n", coex_time);
             if (INTF_TYPE_IS_SDIO(amlbt_if_type))
             {
                 reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A58);
-                printk("w RG_AON_A58 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A58 %#x %#x", reg_value, coex_time);
                 g_hif_sdio_ops.bt_hi_write_word(RG_AON_A58, coex_time);
             }
             if (INTF_TYPE_IS_PCIE(amlbt_if_type))
             {
                 reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A58);
-                printk("w RG_AON_A58 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A58 %#x %#x", reg_value, coex_time);
                 aml_pci_write_for_bt(coex_time, AML_ADDR_AON, RG_AON_A58);
             }
         }
@@ -2810,22 +2804,22 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
         {
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_WIFI_MAX_DURATION copy error\n");
+                BTE("IOCTL_SET_WIFI_MAX_DURATION copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_WIFI_MAX_DURATION %#x\n", coex_time);
+            BTI("IOCTL_SET_WIFI_MAX_DURATION %#x\n", coex_time);
             if (INTF_TYPE_IS_SDIO(amlbt_if_type))
             {
                 reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A59);
                 reg_value = (coex_time & 0xffffff) | (reg_value & 0xff000000);
-                printk("w RG_AON_A59 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A59 %#x %#x", reg_value, coex_time);
                 g_hif_sdio_ops.bt_hi_write_word(RG_AON_A59, reg_value);
             }
             if (INTF_TYPE_IS_PCIE(amlbt_if_type))
             {
                 reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A59);
                 reg_value = (coex_time & 0xffffff) | (reg_value & 0xff000000);
-                printk("w RG_AON_A59 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A59 %#x %#x", reg_value, coex_time);
                 aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_AON_A59);
             }
         }
@@ -2842,10 +2836,10 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
             }
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_BT_COEX_TIME copy error\n");
+                BTE("IOCTL_GET_BT_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_GET_BT_COEX_TIME %#x\n", coex_time);
         }
         break;
         case IOCTL_GET_WIFI_COEX_TIME:
@@ -2860,20 +2854,20 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
             }
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_WIFI_COEX_TIME copy error\n");
+                BTE("IOCTL_GET_WIFI_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_WIFI_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_GET_WIFI_COEX_TIME %#x\n", coex_time);
         }
         break;
         case IOCTL_SET_BT_TX_POWER:
         {
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_BT_TX_POWER copy error\n");
+                BTE("IOCTL_SET_BT_TX_POWER copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_BT_TX_POWER %#x\n", coex_time);
+            BTI("IOCTL_SET_BT_TX_POWER %#x\n", coex_time);
             if (INTF_TYPE_IS_SDIO(amlbt_if_type))
             {
                 if (coex_time >= 0 && coex_time <= 106)
@@ -2881,7 +2875,7 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
                     reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_TX_AGAIN);
                     BTD("r RG_TX_AGAIN %#x", reg_value);
                     reg_value = (again[0] | (reg_value & 0xfffff000));
-                    printk("w RG_TX_AGAIN %#x %#x", reg_value, again[0]);
+                    BTI("w RG_TX_AGAIN %#x %#x", reg_value, again[0]);
                     g_hif_sdio_ops.bt_hi_write_word(RG_TX_AGAIN, reg_value);
                 }
                 else
@@ -2889,7 +2883,7 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
                     reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_TX_AGAIN);
                     BTD("r RG_TX_AGAIN %#x", reg_value);
                     reg_value = (again[1] | (reg_value & 0xfffff000));
-                    printk("w RG_TX_AGAIN %#x %#x", reg_value, again[1]);
+                    BTI("w RG_TX_AGAIN %#x %#x", reg_value, again[1]);
                     g_hif_sdio_ops.bt_hi_write_word(RG_TX_AGAIN, reg_value);
                 }
             }
@@ -2900,7 +2894,7 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
                     reg_value = aml_pci_read_for_bt(AML_ADDR_MAC, RG_TX_AGAIN);
                     BTD("r RG_TX_AGAIN %#x", reg_value);
                     reg_value = (again[0] | (reg_value & 0xfffff000));
-                    printk("w RG_TX_AGAIN %#x %#x", reg_value, again[0]);
+                    BTI("w RG_TX_AGAIN %#x %#x", reg_value, again[0]);
                     aml_pci_write_for_bt(reg_value, AML_ADDR_MAC, RG_TX_AGAIN);
                 }
                 else
@@ -2908,7 +2902,7 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
                     reg_value = aml_pci_read_for_bt(AML_ADDR_MAC, RG_TX_AGAIN);
                     BTD("r RG_TX_AGAIN %#x", reg_value);
                     reg_value = (again[1] | (reg_value & 0xfffff000));
-                    printk("w RG_TX_AGAIN %#x %#x", reg_value, again[1]);
+                    BTI("w RG_TX_AGAIN %#x %#x", reg_value, again[1]);
                     aml_pci_write_for_bt(reg_value, AML_ADDR_MAC, RG_TX_AGAIN);
                 }
             }
@@ -2917,12 +2911,12 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
                 reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_TX_DGAIN);
                 BTD("r RG_TX_DGAIN %#x", reg_value);
                 reg_value = (dgain[coex_time] << 24) | (reg_value & 0x00ffffff);
-                printk("w RG_TX_DGAIN %#x %#x", reg_value, dgain[coex_time]);
+                BTI("w RG_TX_DGAIN %#x %#x", reg_value, dgain[coex_time]);
                 g_hif_sdio_ops.bt_hi_write_word(RG_TX_DGAIN, reg_value);
 
                 reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A59);
                 reg_value |= (1 << 31);
-                printk("w RG_TX_DGAIN %#x", reg_value);
+                BTI("w RG_TX_DGAIN %#x", reg_value);
                 g_hif_sdio_ops.bt_hi_write_word(RG_AON_A59, reg_value);
             }
             if (INTF_TYPE_IS_PCIE(amlbt_if_type))
@@ -2930,12 +2924,12 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
                 reg_value = aml_pci_read_for_bt(AML_ADDR_MAC, RG_TX_DGAIN);
                 BTD("r RG_TX_DGAIN %#x", reg_value);
                 reg_value = (dgain[coex_time] << 24) | (reg_value & 0x00ffffff);
-                printk("w RG_TX_DGAIN %#x %#x", reg_value, dgain[coex_time]);
+                BTI("w RG_TX_DGAIN %#x %#x", reg_value, dgain[coex_time]);
                 aml_pci_write_for_bt(reg_value, AML_ADDR_MAC, RG_TX_DGAIN);
 
                 reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A59);
                 reg_value |= (1 << 31);
-                printk("w RG_TX_DGAIN %#x", reg_value);
+                BTI("w RG_TX_DGAIN %#x", reg_value);
                 aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_AON_A59);
             }
         }
@@ -2954,10 +2948,10 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
             }
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_RF_ANTENNA copy error\n");
+                BTE("IOCTL_GET_RF_ANTENNA copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_RF_ANTENNA %#x\n", coex_time);
+            BTI("IOCTL_GET_RF_ANTENNA %#x\n", coex_time);
         }
         break;
         case IOCTL_GET_BT_RSSI:
@@ -2973,10 +2967,10 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
             coex_time = ((reg_value >> 24) & 0x7f);
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_BT_RSSI copy error\n");
+                BTE("IOCTL_GET_BT_RSSI copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_RSSI %#x\n", coex_time);
+            BTI("IOCTL_GET_BT_RSSI %#x\n", coex_time);
         }
         break;
         case IOCTL_GET_BT_TIME_PERCENT:
@@ -2997,10 +2991,10 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
             bt_percent = (bt_time * 100) / (bt_time + wf_time);
             if (copy_to_user((int __user *)arg, &bt_percent, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_BT_TIME_PERCENT copy error\n");
+                BTE("IOCTL_GET_BT_TIME_PERCENT copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_TIME_PERCENT %d\n", bt_percent);
+            BTI("IOCTL_GET_BT_TIME_PERCENT %d\n", bt_percent);
         }
         break;
         case IOCTL_GET_WF_TIME_PERCENT:
@@ -3021,34 +3015,34 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
             wf_percent = (100 * wf_time) / (bt_time + wf_time);
             if (copy_to_user((int __user *)arg, &wf_percent, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_WF_TIME_PERCENT copy error\n");
+                BTE("IOCTL_GET_WF_TIME_PERCENT copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_WF_TIME_PERCENT %d\n", wf_percent);
+            BTI("IOCTL_GET_WF_TIME_PERCENT %d\n", wf_percent);
         }
         break;
         case IOCTL_EXIT_USER:
         {
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_EXIT_USER copy error\n");
+                BTE("IOCTL_EXIT_USER copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_EXIT_USER %#x\n", coex_time);
+            BTI("IOCTL_EXIT_USER %#x\n", coex_time);
             if (INTF_TYPE_IS_SDIO(amlbt_if_type))
             {
                 reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A59);
-                //printk("r RG_AON_A59 %#x", reg_value);
+                //BTI("r RG_AON_A59 %#x", reg_value);
                 reg_value &= (coex_time << 31);
-                printk("w RG_AON_A59 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A59 %#x %#x", reg_value, coex_time);
                 g_hif_sdio_ops.bt_hi_write_word(RG_AON_A59, reg_value);
             }
             if (INTF_TYPE_IS_PCIE(amlbt_if_type))
             {
                 reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A59);
-                //printk("r RG_AON_A59 %#x", reg_value);
+                //BTI("r RG_AON_A59 %#x", reg_value);
                 reg_value &= (coex_time << 31);
-                printk("w RG_AON_A59 %#x %#x", reg_value, coex_time);
+                BTI("w RG_AON_A59 %#x %#x", reg_value, coex_time);
                 aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_AON_A59);
             }
 
@@ -3072,15 +3066,15 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         {
             if (copy_to_user((unsigned char __user *)arg, &download_fw, sizeof(unsigned char)) != 0)
             {
-                printk("IOCTL_GET_BT_DOWNLOAD_STATUS copy error\n");
+                BTE("IOCTL_GET_BT_DOWNLOAD_STATUS copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_DOWNLOAD_STATUS %#x\n", coex_time);
+            BTI("IOCTL_GET_BT_DOWNLOAD_STATUS %#x\n", coex_time);
         }
         break;
         case IOCTL_SET_BT_RESET:
         {
-            printk("IOCTL_SET_BT_RESET\n");
+            BTI("IOCTL_SET_BT_RESET\n");
             download_fw = 0;
             download_end = 0;
             download_flag = 0;
@@ -3098,17 +3092,17 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         {
             if (!download_fw)
             {
-                printk("IOCTL_SET_BT_COEX_TIME bt firmware state error\n");
+                BTE("IOCTL_SET_BT_COEX_TIME bt firmware state error\n");
                 return -EFAULT;
             }
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_BT_COEX_TIME copy error\n");
+                BTE("IOCTL_SET_BT_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_BT_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_SET_BT_COEX_TIME %#x\n", coex_time);
             reg_value = amlbt_usb_read_word(RG_AON_A57, BT_EP);
-            printk("w RG_AON_A57 %#x %#x", reg_value, coex_time);
+            BTI("w RG_AON_A57 %#x %#x", reg_value, coex_time);
             amlbt_usb_write_word(RG_AON_A57, coex_time, BT_EP);
         }
         break;
@@ -3116,17 +3110,17 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         {
             if (!download_fw)
             {
-                printk("IOCTL_SET_WIFI_COEX_TIME bt firmware state error\n");
+                BTE("IOCTL_SET_WIFI_COEX_TIME bt firmware state error\n");
                 return -EFAULT;
             }
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_WIFI_COEX_TIME copy error\n");
+                BTE("IOCTL_SET_WIFI_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_WIFI_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_SET_WIFI_COEX_TIME %#x\n", coex_time);
             reg_value = amlbt_usb_read_word(RG_AON_A58, BT_EP);
-            printk("w RG_AON_A58 %#x %#x", reg_value, coex_time);
+            BTI("w RG_AON_A58 %#x %#x", reg_value, coex_time);
             amlbt_usb_write_word(RG_AON_A58, coex_time, BT_EP);
         }
         break;
@@ -3134,19 +3128,19 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         {
             if (!download_fw)
             {
-                printk("IOCTL_SET_WIFI_MAX_DURATION bt firmware state error\n");
+                BTE("IOCTL_SET_WIFI_MAX_DURATION bt firmware state error\n");
                 return -EFAULT;
             }
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_WIFI_MAX_DURATION copy error\n");
+                BTE("IOCTL_SET_WIFI_MAX_DURATION copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_WIFI_MAX_DURATION %#x\n", coex_time);
+            BTI("IOCTL_SET_WIFI_MAX_DURATION %#x\n", coex_time);
             reg_value = amlbt_usb_read_word(RG_AON_A59, BT_EP);
             BTD("r RG_AON_A59 %#x", reg_value);
             reg_value = (coex_time & 0xffffff) | (reg_value & 0xff000000);
-            printk("w RG_AON_A59 %#x %#x", reg_value, coex_time);
+            BTI("w RG_AON_A59 %#x %#x", reg_value, coex_time);
             amlbt_usb_write_word(RG_AON_A59, reg_value, BT_EP);
         }
         break;
@@ -3154,53 +3148,53 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         {
             if (!download_fw)
             {
-                printk("IOCTL_GET_BT_COEX_TIME bt firmware state error\n");
+                BTE("IOCTL_GET_BT_COEX_TIME bt firmware state error\n");
                 return -EFAULT;
             }
             coex_time = amlbt_usb_read_word(RG_AON_A60, BT_EP);
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_BT_COEX_TIME copy error\n");
+                BTE("IOCTL_GET_BT_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_GET_BT_COEX_TIME %#x\n", coex_time);
         }
         break;
         case IOCTL_GET_WIFI_COEX_TIME:
         {
             if (!download_fw)
             {
-                printk("IOCTL_GET_WIFI_COEX_TIME bt firmware state error\n");
+                BTE("IOCTL_GET_WIFI_COEX_TIME bt firmware state error\n");
                 return -EFAULT;
             }
             coex_time = amlbt_usb_read_word(RG_AON_A61, BT_EP);
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_WIFI_COEX_TIME copy error\n");
+                BTE("IOCTL_GET_WIFI_COEX_TIME copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_WIFI_COEX_TIME %#x\n", coex_time);
+            BTI("IOCTL_GET_WIFI_COEX_TIME %#x\n", coex_time);
         }
         break;
         case IOCTL_SET_BT_TX_POWER:
         {
             if (!download_fw)
             {
-                printk("IOCTL_SET_BT_TX_POWER bt firmware state error\n");
+                BTE("IOCTL_SET_BT_TX_POWER bt firmware state error\n");
                 return -EFAULT;
             }
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_SET_BT_TX_POWER copy error\n");
+                BTE("IOCTL_SET_BT_TX_POWER copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_SET_BT_TX_POWER %#x\n", coex_time);
+            BTI("IOCTL_SET_BT_TX_POWER %#x\n", coex_time);
             if (coex_time >= 0 && coex_time <= 106)
             {
                 reg_value = amlbt_usb_read_word(RG_TX_AGAIN, BT_EP);
                 BTD("r RG_TX_AGAIN %#x", reg_value);
                 reg_value = (again[0] | (reg_value & 0xfffff000));
-                printk("w RG_TX_AGAIN %#x %#x", reg_value, again[0]);
+                BTI("w RG_TX_AGAIN %#x %#x", reg_value, again[0]);
                 amlbt_usb_write_word(RG_TX_AGAIN, reg_value, BT_EP);
             }
             else
@@ -3208,18 +3202,18 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
                 reg_value = amlbt_usb_read_word(RG_TX_AGAIN, BT_EP);
                 BTD("r RG_TX_AGAIN %#x", reg_value);
                 reg_value = (again[1] | (reg_value & 0xfffff000));
-                printk("w RG_TX_AGAIN %#x %#x", reg_value, again[1]);
+                BTI("w RG_TX_AGAIN %#x %#x", reg_value, again[1]);
                 amlbt_usb_write_word(RG_TX_AGAIN, reg_value, BT_EP);
             }
             reg_value = amlbt_usb_read_word(RG_TX_DGAIN, BT_EP);
             BTD("r RG_TX_AGAIN %#x", reg_value);
             reg_value = (dgain[coex_time] << 24) | (reg_value & 0x00ffffff);
-            printk("w RG_TX_AGAIN %#x %#x", reg_value, dgain[coex_time]);
+            BTI("w RG_TX_AGAIN %#x %#x", reg_value, dgain[coex_time]);
             amlbt_usb_write_word(RG_TX_DGAIN, reg_value, BT_EP);
 
             reg_value = amlbt_usb_read_word(RG_AON_A59, BT_EP);
             reg_value |= (1 << 31);
-            printk("w RG_TX_DGAIN %#x", reg_value);
+            BTI("w RG_TX_DGAIN %#x", reg_value);
             amlbt_usb_write_word(RG_AON_A59, reg_value, BT_EP);
         }
         break;
@@ -3227,34 +3221,34 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         {
             if (!download_fw)
             {
-                printk("IOCTL_GET_RF_ANTENNA bt firmware state error\n");
+                BTE("IOCTL_GET_RF_ANTENNA bt firmware state error\n");
                 return -EFAULT;
             }
             reg_value = amlbt_usb_read_word(REG_PMU_POWER_CFG, BT_EP);
             coex_time = ((reg_value >> BIT_RF_NUM) & 0x03);
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_RF_ANTENNA copy error\n");
+                BTI("IOCTL_GET_RF_ANTENNA copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_RF_ANTENNA %#x\n", coex_time);
+            BTI("IOCTL_GET_RF_ANTENNA %#x\n", coex_time);
         }
         break;
         case IOCTL_GET_BT_RSSI:
         {
             if (!download_fw)
             {
-                printk("IOCTL_GET_BT_RSSI bt firmware state error\n");
+                BTE("IOCTL_GET_BT_RSSI bt firmware state error\n");
                 return -EFAULT;
             }
             reg_value = amlbt_usb_read_word(RG_AON_A59, BT_EP);
             coex_time = ((reg_value >> 24) & 0x7f);
             if (copy_to_user((int __user *)arg, &coex_time, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_BT_RSSI copy error\n");
+                BTE("IOCTL_GET_BT_RSSI copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_RSSI %#x\n", coex_time);
+            BTI("IOCTL_GET_BT_RSSI %#x\n", coex_time);
         }
         break;
         case IOCTL_GET_BT_TIME_PERCENT:
@@ -3267,10 +3261,10 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             bt_percent = (bt_time * 100) / (bt_time + wf_time);
             if (copy_to_user((int __user *)arg, &bt_percent, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_BT_TIME_PERCENT copy error\n");
+                BTE("IOCTL_GET_BT_TIME_PERCENT copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_BT_TIME_PERCENT %d\n", bt_percent);
+            BTI("IOCTL_GET_BT_TIME_PERCENT %d\n", bt_percent);
         }
         break;
         case IOCTL_GET_WF_TIME_PERCENT:
@@ -3283,24 +3277,24 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             wf_percent = (100 * wf_time) / (bt_time + wf_time);
             if (copy_to_user((int __user *)arg, &wf_percent, sizeof(int)) != 0)
             {
-                printk("IOCTL_GET_WF_TIME_PERCENT copy error\n");
+                BTE("IOCTL_GET_WF_TIME_PERCENT copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_GET_WF_TIME_PERCENT %d\n", wf_percent);
+            BTI("IOCTL_GET_WF_TIME_PERCENT %d\n", wf_percent);
         }
         break;
         case IOCTL_EXIT_USER:
         {
             if (copy_from_user(&coex_time, (int __user *)arg, sizeof(int)) != 0)
             {
-                printk("IOCTL_EXIT_USER copy error\n");
+                BTE("IOCTL_EXIT_USER copy error\n");
                 return -EFAULT;
             }
-            printk("IOCTL_EXIT_USER %#x\n", coex_time);
+            BTI("IOCTL_EXIT_USER %#x\n", coex_time);
             reg_value = amlbt_usb_read_word(RG_AON_A59, BT_EP);
-            //printk("r RG_AON_A59 %#x", reg_value);
+            //BTI("r RG_AON_A59 %#x", reg_value);
             reg_value &= (coex_time << 31);
-            printk("w RG_AON_A59 %#x %#x", reg_value, coex_time);
+            BTI("w RG_AON_A59 %#x %#x", reg_value, coex_time);
             amlbt_usb_write_word(RG_AON_A59, reg_value, BT_EP);
         }
         break;
@@ -3326,28 +3320,28 @@ static int amlbt_usb_char_init(void)
     int res = 0;
     struct device *dev;
 
-    printk("%s\n", __func__);
+    BTI("%s\n", __func__);
 
     //	init_timer(&r_timer);
 
     bt_char_class = class_create(THIS_MODULE, AML_BT_CHAR_DEVICE_NAME);
     if (IS_ERR(bt_char_class))
     {
-        printk("%s:Failed to create bt char class\n", __func__);
+        BTE("%s:Failed to create bt char class\n", __func__);
         return PTR_ERR(bt_char_class);
     }
 
     res = alloc_chrdev_region(&bt_devid, 0, 1, AML_BT_CHAR_DEVICE_NAME);
     if (res < 0)
     {
-        printk("%s:Failed to allocate bt char device\n", __func__);
+        BTE("%s:Failed to allocate bt char device\n", __func__);
         goto err_alloc;
     }
 
     dev = device_create(bt_char_class, NULL, bt_devid, NULL, AML_BT_CHAR_DEVICE_NAME);
     if (IS_ERR(dev))
     {
-        printk("%s:Failed to create bt char device\n", __func__);
+        BTE("%s:Failed to create bt char device\n", __func__);
         res = PTR_ERR(dev);
         goto err_create;
     }
@@ -3356,7 +3350,7 @@ static int amlbt_usb_char_init(void)
     res = cdev_add(&bt_char_dev, bt_devid, 1);
     if (res < 0)
     {
-        printk("%s:Failed to add bt char device\n", __func__);
+        BTE("%s:Failed to add bt char device\n", __func__);
         goto err_add;
     }
     //g_cdev = dev;
@@ -3398,22 +3392,22 @@ static void amlbt_cmd_test(void)
 
     if (!memcmp(BT_fwICCM, BT_fwDCCM, 20 * 1024))
     {
-        printk("check ok!\n");
+        BTE("check ok!\n");
     }
     else
     {
-        printk("check err : %#x,%#x,%#x,%#x \n", BT_fwDCCM[0], BT_fwDCCM[1], BT_fwDCCM[2], BT_fwDCCM[3]);
+        BTE("check err : %#x,%#x,%#x,%#x \n", BT_fwDCCM[0], BT_fwDCCM[1], BT_fwDCCM[2], BT_fwDCCM[3]);
     }
     memset(BT_fwDCCM, 0xaa, bt_dccm_size);
     amlbt_usb_write_sram(BT_fwICCM, (unsigned char *)(unsigned long)(0x00400000), 20 * 1024, BT_EP);
     amlbt_usb_read_sram(BT_fwDCCM, (unsigned char *)(unsigned long)(0x00400000), 20 * 1024, BT_EP);
     if (!memcmp(BT_fwICCM, BT_fwDCCM, 20 * 1024))
     {
-        printk("check2 ok!\n");
+        BTE("check2 ok!\n");
     }
     else
     {
-        printk("check2 err : %#x,%#x,%#x,%#x \n", BT_fwDCCM[0], BT_fwDCCM[1], BT_fwDCCM[2], BT_fwDCCM[3]);
+        BTE("check2 err : %#x,%#x,%#x,%#x \n", BT_fwDCCM[0], BT_fwDCCM[1], BT_fwDCCM[2], BT_fwDCCM[3]);
     }
 }
 
@@ -3519,13 +3513,13 @@ void amlbt_sdio_download_firmware(void)
 
 static int amlbt_sdio_fops_open(struct inode *inode, struct file *file)
 {
-    printk("%s bt opened rf num:%#x\n", __func__, rf_num);
+    BTI("%s bt opened rf num:%#x\n", __func__, rf_num);
     if (sdio_buf == NULL)
     {
         sdio_buf = kzalloc(HCI_MAX_FRAME_SIZE, GFP_DMA|GFP_ATOMIC);
     }
 
-    printk("%s, %#x \n", __func__, AML_BT_VERSION);
+    BTI("%s, %#x \n", __func__, AML_BT_VERSION);
     close_state = 0;
     download_fw = 0;
     download_end = 0;
@@ -3537,14 +3531,14 @@ static int amlbt_sdio_fops_open(struct inode *inode, struct file *file)
 
     g_lib_cmd_fifo = gdsl_fifo_init(sizeof(sdio_cmd_buff), sdio_cmd_buff);
     //rf_num = ((g_hif_sdio_ops.bt_hi_read_word(REG_PMU_POWER_CFG) >> BIT_RF_NUM) & 0x03);
-    //printk("%s set rf num %#x", __func__, rf_num);
+    //BTI("%s set rf num %#x", __func__, rf_num);
     init_completion(&download_completion);
     return nonseekable_open(inode, file);
 }
 
 static int amlbt_sdio_fops_close(struct inode *inode, struct file *file)
 {
-    printk("%s BT closed\n", __func__);
+    BTI("%s BT closed\n", __func__);
     download_fw = 0;
     gdsl_fifo_deinit(g_lib_cmd_fifo);
     g_lib_cmd_fifo = 0;
@@ -3583,7 +3577,7 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
 
     if (copy_from_user(sdio_buf, buf_p, count))
     {
-        printk("%s: Failed to get data from user space\n", __func__);
+        BTE("%s: Failed to get data from user space\n", __func__);
         return -EFAULT;
     }
 
@@ -3595,8 +3589,8 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
         if (FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type))
         {
             rf_num = reg_value >> BIT_RF_NUM;
-            printk("BT set rf succeed!\n");
-            printk("%s set rf num %#x", __func__, rf_num);
+            BTI("BT set rf succeed!\n");
+            BTI("%s set rf num %#x", __func__, rf_num);
         }
         return count;
     }
@@ -3612,12 +3606,12 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
 
     if (n == size)
     {
-        printk("CMD_I:%#x, %d\n", cmd_index, count);
+        BTE("CMD_I:%#x, %d\n", cmd_index, count);
         for (n = 0; n < 11; n++)
         {
-            printk("%#x|", sdio_buf[n]);
+            BTE("%#x|", sdio_buf[n]);
         }
-        printk("---------------cmd error!------------");
+        BTE("---------------cmd error!------------");
         return -EINVAL;
     }
 
@@ -3627,19 +3621,19 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
     {
         len = count - 7;
         offset = ((sdio_buf[6] << 24) | (sdio_buf[5] << 16) | (sdio_buf[4] << 8) | sdio_buf[3]);
-        //printk("%#x,%#x,%#x\n", len, offset, dw_state);
-        //printk("%#x,%#x,%#x,%#x\n", sdio_buf[8], sdio_buf[9], sdio_buf[10], sdio_buf[11]);
+        //BTI("%#x,%#x,%#x\n", len, offset, dw_state);
+        //BTI("%#x,%#x,%#x,%#x\n", sdio_buf[8], sdio_buf[9], sdio_buf[10], sdio_buf[11]);
         if (offset == bt_iccm_rom_size)
         {
-            printk("iccm start dw_state %#x\n", dw_state);
+            BTI("iccm start dw_state %#x\n", dw_state);
 #if 0
             if (!download_flag)
             {
                 if (FAMILY_TYPE_IS_W2(amlbt_if_type))
                 {
-                    //printk("w2 usb write first reg\n");
+                    //BTI("w2 usb write first reg\n");
                     g_hif_sdio_ops.bt_hi_write_word(0xf03050, 0);
-                    //printk("w2 usb write first reg end\n");
+                    //BTI("w2 usb write first reg end\n");
                 }
             }
 #endif
@@ -3654,10 +3648,10 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
             {
                 BT_fwDCCM = vmalloc(bt_dccm_size);
             }
-            printk("amlbt_sdio_char_write BT_fwICCM %#x, BT_fwDCCM %#x \n", (unsigned long)BT_fwICCM, (unsigned long)BT_fwDCCM);
+            BTI("amlbt_sdio_char_write BT_fwICCM %#x, BT_fwDCCM %#x \n", (unsigned long)BT_fwICCM, (unsigned long)BT_fwDCCM);
             if (BT_fwICCM == NULL || BT_fwDCCM == NULL)
             {
-                printk("amlbt_usb_char_write_fw vmalloc err!!\n");
+                BTE("amlbt_usb_char_write_fw vmalloc err!!\n");
                 if (BT_fwICCM != NULL)
                 {
                     vfree(BT_fwICCM);
@@ -3674,7 +3668,7 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
 
         if (offset == DCCM_RAM_BASE)
         {
-            printk("dccm start\n");
+            BTI("dccm start\n");
             dw_state = 1;
         }
 
@@ -3691,7 +3685,7 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
              //   buf[1],buf[2],buf[3],buf[4],buf[5],buf[6],buf[7],buf[8],buf[9],buf[10],buf[11],buf[12],
                // buf[13],buf[14],buf[15]);
             iccm_base_addr += len;
-            //printk("%#x \n", offset);
+            //BTI("%#x \n", offset);
         }
         else
         {
@@ -3712,12 +3706,12 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
             if (dccm_base_addr >= 0x20000)
             {
                 amlbt_sdio_download_firmware();
-                printk("download finished!\n");
+                BTI("download finished!\n");
                 vfree(BT_fwICCM);
                 vfree(BT_fwDCCM);
                 BT_fwICCM = NULL;
                 BT_fwDCCM = NULL;
-                printk("W E %#x,%#x\n", iccm_base_addr, dccm_base_addr);
+                BTI("W E %#x,%#x\n", iccm_base_addr, dccm_base_addr);
                 download_end = 1;
             }
         }
@@ -3787,7 +3781,7 @@ static ssize_t amlbt_sdio_char_read(struct file *file_p,
                 download_flag = 1;
                 fw_cmd_r = 0;
                 fw_cmd_w = 0;
-                printk("%s end \n", __func__);
+                BTI("%s end \n", __func__);
             }
         }
         break;
@@ -3818,12 +3812,12 @@ static int amlbt_sdio_init(void)
     ret = alloc_chrdev_region(&devID, 0, 1, AML_BT_NOTE);
     if (ret)
     {
-        printk("fail to allocate chrdev\n");
+        BTE("fail to allocate chrdev\n");
         return ret;
     }
 
     amlbt_sdio_major = MAJOR(devID);
-    printk("major number:%d\n", amlbt_sdio_major);
+    BTI("major number:%d\n", amlbt_sdio_major);
     cdev_init(&amlbt_sdio_cdev, &amlbt_sdio_fops);
     amlbt_sdio_cdev.owner = THIS_MODULE;
 
@@ -3831,13 +3825,13 @@ static int amlbt_sdio_init(void)
     if (cdevErr)
         goto error;
 
-    printk("%s driver(major %d) installed.\n",
+    BTI("%s driver(major %d) installed.\n",
            "BT_sdiodev", amlbt_sdio_major);
 
     amlbt_sdio_class = class_create(THIS_MODULE, AML_BT_NOTE);
     if (IS_ERR(amlbt_sdio_class))
     {
-        printk("class create fail, error code(%ld)\n",
+        BTE("class create fail, error code(%ld)\n",
                PTR_ERR(amlbt_sdio_class));
         goto err1;
     }
@@ -3845,13 +3839,13 @@ static int amlbt_sdio_init(void)
     amlbt_sdio_dev = device_create(amlbt_sdio_class, NULL, devID, NULL, AML_BT_NOTE);
     if (IS_ERR(amlbt_sdio_dev))
     {
-        printk("device create fail, error code(%ld)\n",
+        BTE("device create fail, error code(%ld)\n",
                PTR_ERR(amlbt_sdio_dev));
         goto err2;
     }
 
-    printk("%s: BT_major %d\n", __func__, amlbt_sdio_major);
-    printk("%s: devID %d\n", __func__, devID);
+    BTI("%s: BT_major %d\n", __func__, amlbt_sdio_major);
+    BTI("%s: devID %d\n", __func__, devID);
 
     return 0;
 
@@ -3877,15 +3871,15 @@ error:
 static int amlbt_sdio_insmod(void)
 {
     int ret = 0;
-    printk("BTAML version:%#x\n", AML_BT_VERSION);
-    printk("++++++sdio bt driver insmod start.++++++\n");
+    BTI("BTAML version:%#x\n", AML_BT_VERSION);
+    BTI("++++++sdio bt driver insmod start.++++++\n");
     ret = amlbt_sdio_init();
     if (ret)
     {
-        printk("%s: amlbt_sdio_init failed!\n", __func__);
+        BTE("%s: amlbt_sdio_init failed!\n", __func__);
         return ret;
     }
-    printk("------sdio bt driver insmod end.------\n");
+    BTI("------sdio bt driver insmod end.------\n");
     return ret;
 }
 
@@ -3907,20 +3901,20 @@ static int amlbt_sdio_exit(void)
 
     unregister_chrdev_region(dev, 1);
 
-    printk("%s driver removed.\n", AML_BT_NOTE);
+    BTI("%s driver removed.\n", AML_BT_NOTE);
     return 0;
 }
 
 static void amlbt_sdio_rmmod(void)
 {
-    printk("++++++sdio bt driver rmmod start++++++\n");
+    BTI("++++++sdio bt driver rmmod start++++++\n");
     amlbt_sdio_exit();
-    printk("------sdio bt driver rmmod end------\n");
+    BTI("------sdio bt driver rmmod end------\n");
 }
 
 static void bt_earlysuspend(struct early_suspend *h)
 {
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
 }
 
 static void bt_lateresume(struct early_suspend *h)
@@ -3930,24 +3924,24 @@ static void bt_lateresume(struct early_suspend *h)
     if ((FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type)) && INTF_TYPE_IS_SDIO(amlbt_if_type))
     {
         reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value &= ~(1 << 26);
         g_hif_sdio_ops.bt_hi_write_word(RG_AON_A52, reg_value);
-        printk("RG_AON_A52:%#x", g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52));
+        BTI("RG_AON_A52:%#x", g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52));
     }
     if ((FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type)) && INTF_TYPE_IS_PCIE(amlbt_if_type))
     {
         reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value &= ~(1 << 26);
         aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_AON_A52);
-        printk("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
+        BTI("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
     }
 }
 
 static int amlbt_sdio_probe(struct platform_device *dev)
 {
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
     amlbt_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
     amlbt_early_suspend.suspend = bt_earlysuspend;
     amlbt_early_suspend.resume = bt_lateresume;
@@ -3959,7 +3953,7 @@ static int amlbt_sdio_probe(struct platform_device *dev)
 
 static int amlbt_sdio_remove(struct platform_device *dev)
 {
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
     unregister_early_suspend(&amlbt_early_suspend);
     amlbt_sdio_rmmod();
     kfree(sdio_buf);
@@ -3973,20 +3967,20 @@ static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
     if ((FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type)) && INTF_TYPE_IS_SDIO(amlbt_if_type))
     {
         reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value |= (1 << 26);
         g_hif_sdio_ops.bt_hi_write_word(RG_AON_A52, reg_value);
-        printk("RG_AON_A52:%#x", g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52));
+        BTI("RG_AON_A52:%#x", g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52));
     }
     if ((FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type)) && INTF_TYPE_IS_PCIE(amlbt_if_type))
     {
         reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value |= (1 << 26);
         aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_AON_A52);
-        printk("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
+        BTI("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
     }
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
     return 0;
 }
 
@@ -3999,28 +3993,28 @@ static int amlbt_sdio_resume(struct platform_device *dev)
         if (FAMILY_TYPE_IS_W2(amlbt_if_type) && INTF_TYPE_IS_SDIO(amlbt_if_type))
         {
             reg_value = g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52);
-            printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+            BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
             reg_value &= ~(1 << 26);
             g_hif_sdio_ops.bt_hi_write_word(RG_AON_A52, reg_value);
-            printk("RG_AON_A52:%#x", g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52));
+            BTI("RG_AON_A52:%#x", g_hif_sdio_ops.bt_hi_read_word(RG_AON_A52));
         }
         if (FAMILY_TYPE_IS_W2(amlbt_if_type) && INTF_TYPE_IS_PCIE(amlbt_if_type))
         {
             reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52);
-            printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+            BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
             reg_value &= ~(1 << 26);
             aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_AON_A52);
-            printk("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
+            BTI("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
         }
     }
 #endif
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
     return 0;
 }
 
 static void amlbt_sdio_shutdown(struct platform_device *dev)
 {
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
 }
 
 
@@ -4050,9 +4044,9 @@ static struct platform_driver amlbt_sdio_driver =
 static void amlbt_usb_insmod(void)
 {
     // int ret = 0;
-    printk("BTAML version:%#x\n", AML_BT_VERSION);
-    printk("++++++usb bt driver insmod start.++++++\n");
-    printk("------usb bt driver insmod end.------\n");
+    BTI("BTAML version:%#x\n", AML_BT_VERSION);
+    BTI("++++++usb bt driver insmod start.++++++\n");
+    BTI("------usb bt driver insmod end.------\n");
 
     //return ret;
 }
@@ -4061,13 +4055,13 @@ static void amlbt_usb_rmmod(void)
 {
     //if (amlbt_poweron == AML_SDIO_EN)
     {
-        printk("++++++usb bt driver rmmod start++++++\n");
-        printk("------usb bt driver rmmod end------\n");
+        BTI("++++++usb bt driver rmmod start++++++\n");
+        BTI("------usb bt driver rmmod end------\n");
     }
 }
 static void btusb_earlysuspend(struct early_suspend *h)
 {
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
 }
 
 static void btusb_lateresume(struct early_suspend *h)
@@ -4075,10 +4069,10 @@ static void btusb_lateresume(struct early_suspend *h)
     if (FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type))
     {
         unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value &= ~(1 << 26);
         amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
-        printk("RG_AON_A52:%#x\n", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+        BTI("RG_AON_A52:%#x\n", amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }
     suspend_value = 0;
 }
@@ -4088,8 +4082,8 @@ static int amlbt_usb_probe(struct platform_device *dev)
     int err = 0;
     amlbt_usb_insmod();   //load
     //g_auc_hif_ops.bt_hi_write_word((unsigned int)0x00a0d0e4, 0x8000007f);
-    //printk("%s, %#x", __func__, g_auc_hif_ops.bt_hi_read_word(0x00a0d0e4));
-    printk("%s \n", __func__);
+    //BTI("%s, %#x", __func__, g_auc_hif_ops.bt_hi_read_word(0x00a0d0e4));
+    BTI("%s \n", __func__);
     amlbt_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
     amlbt_early_suspend.suspend = btusb_earlysuspend;
     amlbt_early_suspend.resume = btusb_lateresume;
@@ -4118,13 +4112,13 @@ static int amlbt_usb_probe(struct platform_device *dev)
 #if AML_BT_ROM_CHECK
     amlbt_usb_rom_check();
 #endif
-    printk("%s, end \n", __func__);
+    BTI("%s, end \n", __func__);
     return err;
 }
 
 static int amlbt_usb_remove(struct platform_device *dev)
 {
-    printk("%s\n", __func__);
+    BTI("%s\n", __func__);
 
     amlbt_usb_rmmod();    //unload
 
@@ -4144,7 +4138,7 @@ static int amlbt_usb_remove(struct platform_device *dev)
     download_end = 0;
     download_flag = 0;
     msleep(500);
-    printk("%s end\n", __func__);
+    BTI("%s end\n", __func__);
     return 0;
 }
 
@@ -4154,18 +4148,18 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
     if (FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type))
     {
         unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value |= (1 << 26);
         amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
-        printk("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+        BTI("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
     return 0;
 }
 
 static int amlbt_usb_resume(struct platform_device *dev)
 {
-    printk("%s\n", __func__);
+    BTI("%s\n", __func__);
     //msleep(1500);
 #if 0
     if ((get_resume_method() != RESUME_RTC_S) && (get_resume_method() != RESUME_RTC_C))
@@ -4173,10 +4167,10 @@ static int amlbt_usb_resume(struct platform_device *dev)
         if (FAMILY_TYPE_IS_W2(amlbt_if_type))
         {
             unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
-            printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+            BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
             reg_value &= ~(1 << 26);
             amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
-            printk("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+            BTI("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
         }
     }
 #endif
@@ -4190,12 +4184,12 @@ static void amlbt_usb_shutdown(struct platform_device *dev)
         && (get_resume_method() != RESUME_RTC_S) && (get_resume_method() != RESUME_RTC_C))
     {
         unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
-        printk("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
         reg_value |= (1 << 27);
         amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
-        printk("%s RG_AON_A52:%#x", __func__, amlbt_usb_read_word(RG_AON_A52, BT_EP));
+        BTI("%s RG_AON_A52:%#x", __func__, amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }
-    printk("%s \n", __func__);
+    BTI("%s \n", __func__);
 }
 
 static struct platform_device amlbt_usb_device =
@@ -4227,9 +4221,9 @@ static int amlbt_init(void)
     struct platform_device *p_device = NULL;
     struct platform_driver *p_driver = NULL;
 
-    printk("%s, type:%d \n", __func__, amlbt_if_type);
+    BTI("%s, type:%d \n", __func__, amlbt_if_type);
 
-    printk("%s, type:%#x inter %s, family %s\n", __func__, amlbt_if_type,
+    BTI("%s, type:%#x inter %s, family %s\n", __func__, amlbt_if_type,
            amlbt_family_intf((AMLBT_PD_ID_INTF & amlbt_if_type)),
            amlbt_family_intf(AMLBT_PD_ID_FAMILY & amlbt_if_type));
 
@@ -4245,7 +4239,7 @@ static int amlbt_init(void)
     }
     else
     {
-        printk("%s amlbt_if_type invalid!! \n", __func__);
+        BTE("%s amlbt_if_type invalid!! \n", __func__);
         return ret;
     }
 
@@ -4275,7 +4269,7 @@ static void amlbt_exit(void)
     struct platform_device *p_device = NULL;
     struct platform_driver *p_driver = NULL;
 
-    printk("%s, type:%d \n", __func__, amlbt_if_type);
+    BTI("%s, type:%d \n", __func__, amlbt_if_type);
 
     if (INTF_TYPE_IS_USB(amlbt_if_type))        //usb interface
     {
@@ -4296,5 +4290,5 @@ module_param(amlbt_if_type, uint, S_IRUGO);
 module_init(amlbt_init);
 module_exit(amlbt_exit);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("2024-02-04-1655");
+MODULE_DESCRIPTION("2024-03-04-1040");
 

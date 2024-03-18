@@ -884,8 +884,8 @@ static void property_get_state(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2024-0301-1850\n");
-    ALOGI("Iacc7f1ebc8eecce0d1d96bfd188bfeaef9430be9\n");
+    ALOGI("amlbt init 0x2024-0304-1047\n");
+    ALOGI("I7c812709b8a966352797146dcd5cef01a5dfe7f6\n");
 
     if (p_cb == NULL)
     {
