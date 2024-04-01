@@ -111,8 +111,8 @@ void aml_15p4_handle(void);
 extern void aml_15p4_tx(unsigned char *data, unsigned short len);
 static bool exit_thread;
 pthread_t aml_15p4_handle_thread;
-#define rev_15p4_cmd_fifo "/data/fifo/fifo_cmd_out"
-#define rsp_15p4_rst_fifo "/data/fifo/fifo_cmd_in"
+#define rev_15p4_cmd_fifo "/data/vendor/bluetooth/fifo_cmd_out"
+#define rsp_15p4_rst_fifo "/data/vendor/bluetooth/fifo_cmd_in"
 
 static int S15P4_RF;
 static int S15P4_WF;
@@ -884,8 +884,8 @@ static void property_get_state(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2024-0304-1047\n");
-    ALOGI("I7c812709b8a966352797146dcd5cef01a5dfe7f6\n");
+    ALOGI("amlbt init 0x2024-0402-2020\n");
+    ALOGI("Ib9f3195d65a91ae945df4bd28f4f4a7dae2948da\n");
 
     if (p_cb == NULL)
     {
@@ -1563,6 +1563,13 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     {
                         bt_power = 0;
                         upio_set_bluetooth_power(UPIO_BT_POWER_OFF);
+
+                        if (amlbt_transtype.family_id == AML_W2L &&
+                         amlbt_transtype.interface == AML_INTF_SDIO)
+                        {
+                            rmmod("aml_bt", 400);
+                            rmmod("w2l_comm", 400);
+                        }
                     }
                 }
                 ALOGD("bt_power %d", bt_power);
@@ -1570,12 +1577,6 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                 {
                     exit_thread = true;
                     aml_15p4_deinit();
-                }
-                if (amlbt_transtype.family_id == AML_W2L &&
-                             amlbt_transtype.interface == AML_INTF_SDIO)
-                {
-                    rmmod("aml_bt", 400);
-                    rmmod("w2l_comm", 400);
                 }
                 /*if (!bt_power)
                 {
@@ -1804,7 +1805,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             int err = -1;
             int retry_cnt = 0;
 
-            if (amlbt_transtype.family_id >= AML_W1U && amlbt_transtype.interface == AML_INTF_USB)
+            if (amlbt_transtype.family_id > AML_W1U && amlbt_transtype.interface == AML_INTF_USB)
             {
                 if (*mode == BT_VND_LPM_DISABLE)
                 {
@@ -1871,14 +1872,21 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     }
                 }
             }
-            if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO)
+            if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_USB)
+            {
+                if (*mode == BT_VND_LPM_DISABLE)
+                {
+                    hw_reset_close();
+                }
+            }
+            /*if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO)
             {
                 err = pthread_create(&amlbt_thread_recovery, NULL, amlbt_recovery_init, NULL);
                 if (err != 0)
                 {
                     ALOGE("can't create thread");
                 }
-            }
+            }*/
             retval = hw_lpm_enable(*mode);
         }
         break;

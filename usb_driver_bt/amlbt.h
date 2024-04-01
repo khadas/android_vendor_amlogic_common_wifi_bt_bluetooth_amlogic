@@ -7,8 +7,65 @@ typedef unsigned long SYS_TYPE;
 
 #define AML_BT_CHAR_DEVICE_NAME "aml_btusb"
 #define AML_BT_NOTE "stpbt"
+/**********w1u***************/
+#define WF_SRAM_BASE_ADDR	0x00900000
+#define WF_SRAM_RFU_ADDR	(WF_SRAM_BASE_ADDR + (224*1024))	//0x938000
+#define WF_SRAM_RFU_LEN		(22*1024)
+#define WF_SRAM_CMD_LEN		(2*1024)
+#define WF_SRAM_EVENT_LEN	(4*1024)
+#define WF_SRAM_TX_FIFO_LEN	(32+4)
+#define WF_SRAM_RX_FIFO_LEN	(16+4)
+#define WF_SRAM_TX_Q_NUM	(8)
+
+#define HOST_TX_FIFO_LEN	(128)
+#define TX_Q_LEN			(1024)
+#define RX_Q_LEN			(1024)
+#define RX_TYPE_FIFO_LEN	(1024)
+
+#define WF_SRAM_TX_Q_ADDR		(WF_SRAM_RFU_ADDR + 0x0)			//8k	0x938000
+#define WF_SRAM_RX_Q_ADDR		(WF_SRAM_TX_Q_ADDR + TX_Q_LEN*8)	//4k	0x93a000
+#define WF_SRAM_EVENT_Q_ADDR	(WF_SRAM_RX_Q_ADDR + RX_Q_LEN*4) 	//4k	0x93b000
+#define WF_SRAM_CMD_Q_ADDR		(WF_SRAM_EVENT_Q_ADDR + WF_SRAM_EVENT_LEN) 	//2k	0x93c000
+
+#define WF_SRAM_REG_BASE_ADDR	(WF_SRAM_CMD_Q_ADDR + WF_SRAM_CMD_LEN)
+
+#define WF_SRAM_CMD_FIFO_R_ADDR		(WF_SRAM_REG_BASE_ADDR + 0)
+#define WF_SRAM_CMD_FIFO_W_ADDR    	(WF_SRAM_REG_BASE_ADDR + 0x04)
+
+#define WF_SRAM_EVT_FIFO_R_ADDR		(WF_SRAM_REG_BASE_ADDR + 0x08)
+#define WF_SRAM_EVT_FIFO_W_ADDR  	(WF_SRAM_REG_BASE_ADDR + 0x0c)
+#define WF_SRAM_EVENT_LOCAL_WRITE_OFFSET  (WF_SRAM_REG_BASE_ADDR + 0x10)
+
+#define WF_SRAM_TX_Q_STATUS_ADDR	(WF_SRAM_REG_BASE_ADDR + 0x14)	//32 bytes
+#define WF_SRAM_TX_Q_INDEX_ADDR		(WF_SRAM_REG_BASE_ADDR + 0x34)	//32 bytes
+#define WF_SRAM_TX_Q_PRIO_ADDR		(WF_SRAM_REG_BASE_ADDR + 0x54)	//32 bytes
 
 
+#define WF_SRAM_TX_Q_FIFO_ADDR		(WF_SRAM_REG_BASE_ADDR + 0x84)	//32 bytes
+#define WF_SRAM_RX_Q_FIFO_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xa4)	//16 bytes
+
+#define WF_SRAM_TX_FIFO_R_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xcc)	//4 bytes
+#define WF_SRAM_TX_FIFO_W_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xd0)	//4 bytes
+#define WF_SRAM_RX_FIFO_R_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xd4)	//4 bytes
+#define WF_SRAM_RX_FIFO_W_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xd8)	//4 bytes
+
+
+#define WF_SRAM_RX_TYPE_FIFO_R_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xdc)	//4 bytes
+#define WF_SRAM_RX_TYPE_FIFO_W_ADDR		(WF_SRAM_REG_BASE_ADDR + 0xe0)	//4 bytes
+
+
+#define WF_SRAM_RX_TYPE_FIFO_ADDR		(WF_SRAM_RFU_ADDR + WF_SRAM_RFU_LEN - 2048)
+
+#define WF_SRAM_FW_DOWNLOAD_SIZE	(WF_SRAM_RFU_LEN - 2048)	//20k
+
+#define WF_SRAM_FW_DRIVER_STATUS_ADDR	(WF_SRAM_RFU_ADDR + WF_SRAM_RFU_LEN - 4)	//0x93d7fc
+
+
+
+#define WF_SRAM_FD_DOWNLOAD_W		(1 << 0)	//firmware download write notify
+#define WF_SRAM_FD_INIT_FLAG		(1 << 1)	//driver init flag
+
+/********w2**************/
 #define USB_TX_Q_LEN            (1028)
 #define USB_RX_Q_LEN            (1024)
 #define USB_EVENT_Q_LEN         (1024)

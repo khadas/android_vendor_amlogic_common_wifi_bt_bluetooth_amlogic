@@ -959,7 +959,8 @@ static uint8_t hw_config_set_rf_params(HC_BT_HDR *p_buf)
         {
             UINT32_TO_STREAM(q, (unsigned int)((0x2 << BIT_RF_NUM) | (amlbt_btsink << BT_SINK_MODE)));
         }
-        if (amlbt_transtype.interface == AML_INTF_PCIE)
+        if (amlbt_transtype.interface == AML_INTF_PCIE \
+                                         || (amlbt_transtype.interface == AML_INTF_SDIO && amlbt_transtype.family_id == AML_W1U))
         {
             bt_sdio_fd = userial_vendor_uart_open();
             if (bt_sdio_fd < 0)
@@ -1646,7 +1647,8 @@ uint8_t hw_cfg_download_firmware_iccm_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_
     unsigned char rsp[260];
     unsigned char download_cmd[255] = {0};
     uint8_t *p_dn = 0;
-    if (amlbt_transtype.family_id != AML_W1 && amlbt_transtype.interface == AML_INTF_SDIO)
+
+    if (amlbt_transtype.family_id > AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO)
     {
         bt_sdio_fd = userial_vendor_uart_open();
         if (bt_sdio_fd < 0)
@@ -1654,9 +1656,7 @@ uint8_t hw_cfg_download_firmware_iccm_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_
             BTHWDBG("hw_cfg_download_firmware_iccm_uart open failed!");
             return FALSE;
         }
-    }
-    if (amlbt_transtype.family_id != AML_W1 && amlbt_transtype.interface == AML_INTF_SDIO)
-    {
+
         while (len_iccm)
         {
             p_dn = &download_cmd[0];
