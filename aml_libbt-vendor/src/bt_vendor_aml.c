@@ -1761,7 +1761,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             }
             if (!recovery_flag)
             {
-                if ((amlbt_transtype.family_id >= AML_W1U && amlbt_transtype.interface != AML_INTF_USB)
+                if ((amlbt_transtype.family_id > AML_W1U && amlbt_transtype.interface != AML_INTF_USB)
                     && hw_cfg_cb.state == 0)
                 {
                     property_get(PWR_PROP_NAME, shutdwon_status, "unknown");
@@ -1781,6 +1781,13 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     usleep(100000);
 
                     aml_disbt_configure(g_userial_fd);
+                }
+                if ((amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO) \
+                        && hw_cfg_cb.state == 0)
+                {
+                    usleep(100000);
+                    aml_reset_bt(g_userial_fd);
+                    usleep(100000);
                 }
             }
             download_hw_crash_ioctl();
@@ -1876,7 +1883,9 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             {
                 if (*mode == BT_VND_LPM_DISABLE)
                 {
+                    usleep(100000);
                     hw_reset_close();
+                    usleep(100000);
                 }
             }
             /*if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO)
