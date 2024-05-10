@@ -18,7 +18,7 @@ static struct class *pBTClass;
 static struct device *pBTDev;
 #define BT_NODE "stpbt"
 #define BT_DRIVER_NAME "sdio_bt"
-#define BT_AML_SDIOBT_VERSION "v2.0.2_20231007_sdiobt"
+#define BT_AML_SDIOBT_VERSION "v2.0.2_20240426_sdiobt"
 
 static char *chip_name = "aml_w1";
 //extern unsigned int amlbt_poweron;
@@ -27,8 +27,9 @@ extern void aml_wifi_sdio_power_unlock(void);
 
 static int bt_aml_insmod(void);
 static void bt_aml_rmmod(void);
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
 extern unsigned int get_resume_method(void);
-
+#endif
 static int config_bt_pmu_reg(bool is_power_on)
 {
     unsigned int value_pmu_A12 = 0, value_pmu_A13 = 0, value_pmu_A14 = 0, value_pmu_A15 = 0,
@@ -444,6 +445,7 @@ static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
 static int amlbt_sdio_resume(struct platform_device *dev)
 {
 #if 0
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
     if ((get_resume_method() != 3) && (get_resume_method() != 7))
     {
         unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
@@ -452,6 +454,7 @@ static int amlbt_sdio_resume(struct platform_device *dev)
         g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
         printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
     }
+#endif
 #endif
     return 0;
 }
@@ -602,6 +605,7 @@ static int bt_aml_insmod(void)
     //if (amlbt_poweron == AML_SDIO_EN)
     {
         PRINT("BTAML SDIOBT version:%s\n", BT_AML_SDIOBT_VERSION);
+        PRINT("release commit: 107bb239f7f47bf3a425469e963f02cc8a99eb00 2024-05-10\n");
         PRINT("++++++sdio bt driver insmod start.++++++\n");
         reg_config_complete = 0;
 

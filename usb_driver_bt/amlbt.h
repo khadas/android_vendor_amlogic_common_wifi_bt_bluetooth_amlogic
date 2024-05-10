@@ -66,6 +66,12 @@ typedef unsigned long SYS_TYPE;
 #define WF_SRAM_FD_INIT_FLAG		(1 << 1)	//driver init flag
 
 /********w2**************/
+#define HI_USB_RX_Q_ADDR        0x00500000  //length:4096 bytes
+#define HI_USB_TX_Q_ADDR        0x00508000  //length:4096 bytes
+#define HI_USB_MEM_ADDR         0x00510000  //length:512 bytes
+#define HI_USB_EVENT_Q_ADDR     0x00514000  //length:1340 bytes
+#define HI_USB_CMD_Q_ADDR       0x00518000  //length:4096 bytes
+
 #define USB_TX_Q_LEN            (1028)
 #define USB_RX_Q_LEN            (1024)
 #define USB_EVENT_Q_LEN         (1024)
@@ -79,16 +85,6 @@ typedef unsigned long SYS_TYPE;
 #define BT_DCCM_AHB_BASE        0x00400000
 
 #define WF_SRAM_FD_INIT_FLAG		(1 << 1)	//driver init flag
-
-#define USB_15P4_RX_RAM_ADDR                (0x702000)///USB TXQ base address
-#define USB_15P4_TX_RAM_ADDR                (0x703000)///USB RXQ base address
-#define USB_15P4_RX_RAM_LEN                 (0x800)
-#define USB_15P4_TX_RAM_LEN                 (0x800)
-
-#define USB_15P4_RX_WR_PTR                  (0x0050053c)
-#define USB_15P4_RX_RD_PTR                  (0x00500540)
-#define USB_15P4_TX_WR_PTR                  (0x00500544)
-#define USB_15P4_TX_RD_PTR                  (0x00500548)
 
 #define HCI_MAX_ACL_SIZE    1021
 #define HCI_MAX_SCO_SIZE    255
@@ -334,6 +330,7 @@ struct aml_bus_state_detect {
 #define RG_AON_A15                                (CHIP_INTF_REG_BASE + 0x3c)
 #define RG_AON_A30                                (CHIP_INTF_REG_BASE + 0x78)
 #define RG_AON_A52                                (CHIP_INTF_REG_BASE + 0xd0)
+#define RG_AON_A53                                (CHIP_INTF_REG_BASE + 0xd4)
 /*********amlbt_tool*********/
 #define RG_AON_A55                                (CHIP_INTF_REG_BASE + 0xdc)
 #define RG_AON_A56                                (CHIP_INTF_REG_BASE + 0xe0)

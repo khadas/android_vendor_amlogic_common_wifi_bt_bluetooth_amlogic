@@ -457,7 +457,6 @@ enum {
     AML_W1,
     AML_W1U,
     AML_W2,
-    AML_W2L,
 };
 
 enum {

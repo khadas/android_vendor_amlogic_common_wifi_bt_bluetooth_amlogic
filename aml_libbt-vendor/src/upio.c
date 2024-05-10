@@ -89,10 +89,10 @@
 /* lpm proc control block */
 typedef struct
 {
-	uint8_t		btwrite_active;
-	uint8_t		timer_created;
-	timer_t		timer_id;
-	uint32_t	timeout_ms;
+    uint8_t btwrite_active;
+    uint8_t timer_created;
+    timer_t timer_id;
+    uint32_t timeout_ms;
 } vnd_lpm_proc_cb_t;
 
 static vnd_lpm_proc_cb_t lpm_proc_cb;
@@ -115,15 +115,15 @@ static char *rfkill_state_path = NULL;
 
 /* for friendly debugging outpout string */
 static char *lpm_mode[] = {
-	"UNKNOWN",
-	"disabled",
-	"enabled"
+    "UNKNOWN",
+    "disabled",
+    "enabled"
 };
 
 static char *lpm_state[] = {
-	"UNKNOWN",
-	"de-asserted",
-	"asserted"
+    "UNKNOWN",
+    "de-asserted",
+    "asserted"
 };
 
 extern void ms_delay(uint32_t timeout);
@@ -133,71 +133,71 @@ extern void ms_delay(uint32_t timeout);
 *****************************************************************************/
 static int is_emulator_context(void)
 {
-	char value[PROPERTY_VALUE_MAX];
+    char value[PROPERTY_VALUE_MAX];
 
-	property_get("ro.vendor.kernel.qemu", value, "0");
-	UPIODBG("is_emulator_context : %s", value);
-	if (strcmp(value, "1") == 0) {
-		return 1;
-	}
-	return 0;
+    property_get("ro.vendor.kernel.qemu", value, "0");
+    UPIODBG("is_emulator_context : %s", value);
+    if (strcmp(value, "1") == 0) {
+        return 1;
+    }
+    return 0;
 }
 
 static int is_rfkill_disabled(void)
 {
-	char value[PROPERTY_VALUE_MAX];
+    char value[PROPERTY_VALUE_MAX];
 
-	property_get("ro.vendor.rfkilldisabled", value, "0");
-	UPIODBG("is_rfkill_disabled ? [%s]", value);
+    property_get("ro.vendor.rfkilldisabled", value, "0");
+    UPIODBG("is_rfkill_disabled ? [%s]", value);
 
-	if (strcmp(value, "1") == 0) {
-		return UPIO_BT_POWER_ON;
-	}
+    if (strcmp(value, "1") == 0) {
+        return UPIO_BT_POWER_ON;
+    }
 
-	return UPIO_BT_POWER_OFF;
+    return UPIO_BT_POWER_OFF;
 }
 
 static int init_rfkill()
 {
-	char path[64];
-	char buf[16];
-	int fd, sz, id;
-	sz = -1;//initial
-	if (is_rfkill_disabled())
-		return -1;
+    char path[64];
+    char buf[16];
+    int fd, sz, id;
+    sz = -1;//initial
+    if (is_rfkill_disabled())
+        return -1;
 
-	for (id = 0;; id++)
-	{
-		snprintf(path, sizeof(path), "/sys/class/rfkill/rfkill%d/type", id);
-		fd = open(path, O_RDONLY);
-		if (fd < 0)
-		{
-			ALOGE("init_rfkill : open(%s) failed: %s (%d)\n", \
-			      path, strerror(errno), errno);
-			ALOGE("open failed,use syscontrol\n");
-			sz = amSystemWriteGetProperty(path, (char *)&buf);
-			goto end;
-			//return -1;
-		}
+    for (id = 0;; id++)
+    {
+        snprintf(path, sizeof(path), "/sys/class/rfkill/rfkill%d/type", id);
+        fd = open(path, O_RDONLY);
+        if (fd < 0)
+        {
+            ALOGE("init_rfkill : open(%s) failed: %s (%d)\n", \
+                  path, strerror(errno), errno);
+            ALOGE("open failed,use syscontrol\n");
+            sz = amSystemWriteGetProperty(path, (char *)&buf);
+            goto end;
+            //return -1;
+        }
 
-		sz = read(fd, &buf, sizeof(buf));
-		close(fd);
-end: if (sz >= 9 && memcmp(buf, "bluetooth", 9) == 0)
-		{
-			ALOGE("break");
-			rfkill_id = id;
-			break;
-		}
-		else if (sz == -1)
-		{
-			ALOGE("init_rfkill : open(%s) failed: %s (%d)\n", \
-			      path, strerror(errno), errno);
-			return -1;
-		}
-	}
+        sz = read(fd, &buf, sizeof(buf));
+        close(fd);
+        end: if (sz >= 9 && memcmp(buf, "bluetooth", 9) == 0)
+        {
+            ALOGE("break");
+            rfkill_id = id;
+            break;
+        }
+        else if (sz == -1)
+        {
+            ALOGE("init_rfkill : open(%s) failed: %s (%d)\n", \
+                  path, strerror(errno), errno);
+            return -1;
+        }
+    }
 
-	asprintf(&rfkill_state_path, "/sys/class/rfkill/rfkill%d/state", rfkill_id);
-	return 0;
+    asprintf(&rfkill_state_path, "/sys/class/rfkill/rfkill%d/state", rfkill_id);
+    return 0;
 }
 
 /*****************************************************************************
@@ -216,10 +216,10 @@ end: if (sz >= 9 && memcmp(buf, "bluetooth", 9) == 0)
 *******************************************************************************/
 static void proc_btwrite_timeout(union sigval arg)
 {
-	UPIODBG("..%s..", __FUNCTION__);
-	lpm_proc_cb.btwrite_active = FALSE;
-	/* drive LPM down; this timer should fire only when BT is awake; */
-	upio_set(UPIO_BT_WAKE, UPIO_DEASSERT, 1);
+    UPIODBG("..%s..", __FUNCTION__);
+    lpm_proc_cb.btwrite_active = FALSE;
+    /* drive LPM down; this timer should fire only when BT is awake; */
+    upio_set(UPIO_BT_WAKE, UPIO_DEASSERT, 1);
 }
 
 /******************************************************************************
@@ -232,29 +232,29 @@ static void proc_btwrite_timeout(union sigval arg)
 **
 *****************************************************************************/
 void upio_start_stop_timer(int action) {
-	struct itimerspec ts;
+    struct itimerspec ts;
 
-	if (action == UPIO_ASSERT) {
-		lpm_proc_cb.btwrite_active = TRUE;
-		if (lpm_proc_cb.timer_created == TRUE) {
-			ts.it_value.tv_sec = PROC_BTWRITE_TIMER_TIMEOUT_MS / 1000;
-			ts.it_value.tv_nsec = 1000000 * (PROC_BTWRITE_TIMER_TIMEOUT_MS % 1000);
-			ts.it_interval.tv_sec = 0;
-			ts.it_interval.tv_nsec = 0;
-		}
-	} else {
-		/* unarm timer if writing 0 to lpm; reduce unnecessary user space wakeup */
-		memset(&ts, 0, sizeof(ts));
-	}
+    if (action == UPIO_ASSERT) {
+        lpm_proc_cb.btwrite_active = TRUE;
+        if (lpm_proc_cb.timer_created == TRUE) {
+            ts.it_value.tv_sec = PROC_BTWRITE_TIMER_TIMEOUT_MS / 1000;
+            ts.it_value.tv_nsec = 1000000 * (PROC_BTWRITE_TIMER_TIMEOUT_MS % 1000);
+            ts.it_interval.tv_sec = 0;
+            ts.it_interval.tv_nsec = 0;
+        }
+    } else {
+        /* unarm timer if writing 0 to lpm; reduce unnecessary user space wakeup */
+        memset(&ts, 0, sizeof(ts));
+    }
 
-	if (lpm_proc_cb.timer_id != NULL)
-	{
-		if (timer_settime(lpm_proc_cb.timer_id, 0, &ts, 0) == 0) {
-			UPIODBG("%s : timer_settime success", __FUNCTION__);
-		} else {
-			UPIODBG("%s : timer_settime failed", __FUNCTION__);
-		}
-	}
+    if (lpm_proc_cb.timer_id != NULL)
+    {
+        if (timer_settime(lpm_proc_cb.timer_id, 0, &ts, 0) == 0) {
+            UPIODBG("%s : timer_settime success", __FUNCTION__);
+        } else {
+            UPIODBG("%s : timer_settime failed", __FUNCTION__);
+        }
+    }
 }
 #endif
 
@@ -273,9 +273,9 @@ void upio_start_stop_timer(int action) {
 *******************************************************************************/
 void upio_init(void)
 {
-	memset(upio_state, UPIO_UNKNOWN, UPIO_MAX_COUNT);
+    memset(upio_state, UPIO_UNKNOWN, UPIO_MAX_COUNT);
 #if (BT_WAKE_VIA_PROC == TRUE) && (BTWRITE_ASSERT_TIMER == TRUE)
-	memset(&lpm_proc_cb, 0, sizeof(vnd_lpm_proc_cb_t));
+    memset(&lpm_proc_cb, 0, sizeof(vnd_lpm_proc_cb_t));
 #endif
 }
 
@@ -291,16 +291,16 @@ void upio_init(void)
 void upio_cleanup(void)
 {
 #if (BT_WAKE_VIA_PROC == TRUE) && (BTWRITE_ASSERT_TIMER == TRUE)
-	if (lpm_proc_cb.timer_created == TRUE)
-		timer_delete(lpm_proc_cb.timer_id);
+    if (lpm_proc_cb.timer_created == TRUE)
+        timer_delete(lpm_proc_cb.timer_id);
 
-	lpm_proc_cb.timer_created = FALSE;
+    lpm_proc_cb.timer_created = FALSE;
 #endif
 }
 
 int upio_power_get(void)
 {
-    char buffer = 0;
+    char buffer;
     int sz;
     int fd = -1;
     int ret = 0;
@@ -353,67 +353,67 @@ int upio_power_get(void)
 *******************************************************************************/
 int upio_set_bluetooth_power(int on)
 {
-	int sz;
-	int fd = -1;
-	int ret = -1;
-	char buffer = '0';
+    int sz;
+    int fd = -1;
+    int ret = -1;
+    char buffer = '0';
 
-	switch (on)
-	{
-	case UPIO_BT_POWER_OFF:
-		buffer = '0';
-		break;
+    switch (on)
+    {
+    case UPIO_BT_POWER_OFF:
+        buffer = '0';
+        break;
 
-	case UPIO_BT_POWER_ON:
-		buffer = '1';
-		break;
-	}
+    case UPIO_BT_POWER_ON:
+        buffer = '1';
+        break;
+    }
 
-	if (is_emulator_context())
-	{
-		/* if new value is same as current, return -1 */
-		if (bt_emul_enable == on)
-			return ret;
+    if (is_emulator_context())
+    {
+        /* if new value is same as current, return -1 */
+        if (bt_emul_enable == on)
+            return ret;
 
-		UPIODBG("set_bluetooth_power [emul] %d", on);
+        UPIODBG("set_bluetooth_power [emul] %d", on);
 
-		bt_emul_enable = on;
-		return 0;
-	}
+        bt_emul_enable = on;
+        return 0;
+    }
 
-	/* check if we have rfkill interface */
-	if (is_rfkill_disabled())
-		return 0;
+    /* check if we have rfkill interface */
+    if (is_rfkill_disabled())
+        return 0;
 
-	if (rfkill_id == -1)
-	{
-		if (init_rfkill())
-			return ret;
-	}
+    if (rfkill_id == -1)
+    {
+        if (init_rfkill())
+            return ret;
+    }
 
-	fd = open(rfkill_state_path, O_WRONLY);
+    fd = open(rfkill_state_path, O_WRONLY);
 
-	if (fd < 0)
-	{
-		ALOGE("set_bluetooth_power : open(%s) for write failed: %s (%d)",
-		      rfkill_state_path, strerror(errno), errno);
-		sz = amSystemWriteSetProperty(rfkill_state_path, &buffer, 1);
-		goto last;
-		//return ret;
-	}
+    if (fd < 0)
+    {
+        ALOGE("set_bluetooth_power : open(%s) for write failed: %s (%d)",
+              rfkill_state_path, strerror(errno), errno);
+        sz = amSystemWriteSetProperty(rfkill_state_path, &buffer, 1);
+        goto last;
+        //return ret;
+    }
 
-	sz = write(fd, &buffer, 1);
-	ALOGD("in upio_set_bluetooth_power(), write %c to rfkill state.", buffer);
-	if (fd >= 0)
-		close(fd);
-last:   if (sz < 0) {
-		ALOGE("set_bluetooth_power : write(%s) failed: %s (%d)",
-		      rfkill_state_path, strerror(errno), errno);
-	}
-	else
-		ret = 0;
+    sz = write(fd, &buffer, 1);
+    ALOGD("in upio_set_bluetooth_power(), write %c to rfkill state.", buffer);
+    if (fd >= 0)
+        close(fd);
+    last:   if (sz < 0) {
+        ALOGE("set_bluetooth_power : write(%s) failed: %s (%d)",
+          rfkill_state_path, strerror(errno), errno);
+    }
+    else
+        ret = 0;
 
-	return ret;
+    return ret;
 }
 
 
@@ -428,172 +428,172 @@ last:   if (sz < 0) {
 *******************************************************************************/
 void upio_set(uint8_t pio, uint8_t action, uint8_t polarity __unused)
 {
-	//int rc;
+    //int rc;
 #if (BT_WAKE_VIA_PROC == TRUE)
-	int fd = -1;
-	char buffer;
+    int fd = -1;
+    char buffer;
 #endif
 
-	ALOGD("%s : pio %d action %d, polarity %d", __FUNCTION__, pio, action, polarity);
+    ALOGD("%s : pio %d action %d, polarity %d", __FUNCTION__, pio, action, polarity);
 
-	switch (pio)
-	{
-	case UPIO_LPM_MODE:
-		if (upio_state[UPIO_LPM_MODE] == action)
-		{
-			ALOGD("LPM is %s already", lpm_mode[action]);
-			return;
-		}
+    switch (pio)
+    {
+    case UPIO_LPM_MODE:
+        if (upio_state[UPIO_LPM_MODE] == action)
+        {
+            ALOGD("LPM is %s already", lpm_mode[action]);
+            return;
+        }
 
-		upio_state[UPIO_LPM_MODE] = action;
+        upio_state[UPIO_LPM_MODE] = action;
 
 #if (BT_WAKE_VIA_PROC == TRUE)
-		fd = open(VENDOR_LPM_PROC_NODE, O_WRONLY);
+        fd = open(VENDOR_LPM_PROC_NODE, O_WRONLY);
 
-		if (fd < 0)
-		{
-			ALOGE("upio_set : open(%s) for write failed: %s (%d)",
-			      VENDOR_LPM_PROC_NODE, strerror(errno), errno);
-			return;
-		}
+        if (fd < 0)
+        {
+            ALOGE("upio_set : open(%s) for write failed: %s (%d)",
+                  VENDOR_LPM_PROC_NODE, strerror(errno), errno);
+            return;
+        }
 
-		if (action == UPIO_ASSERT)
-		{
-			buffer = '1';
-		}
-		else
-		{
-			buffer = '0';
+        if (action == UPIO_ASSERT)
+        {
+            buffer = '1';
+        }
+        else
+        {
+            buffer = '0';
 #if (BTWRITE_ASSERT_TIMER == TRUE)
-			// delete btwrite assertion holding timer
-			if (lpm_proc_cb.timer_created == TRUE)
-			{
-				timer_delete(lpm_proc_cb.timer_id);
-				lpm_proc_cb.timer_created = FALSE;
-			}
+            // delete btwrite assertion holding timer
+            if (lpm_proc_cb.timer_created == TRUE)
+            {
+                timer_delete(lpm_proc_cb.timer_id);
+                lpm_proc_cb.timer_created = FALSE;
+            }
 #endif
-		}
+        }
 
-		if (write(fd, &buffer, 1) < 0)
-		{
-			ALOGE("upio_set : write(%s) failed: %s (%d)",
-			      VENDOR_LPM_PROC_NODE, strerror(errno), errno);
-		}
+        if (write(fd, &buffer, 1) < 0)
+        {
+            ALOGE("upio_set : write(%s) failed: %s (%d)",
+                  VENDOR_LPM_PROC_NODE, strerror(errno), errno);
+        }
 #if (PROC_BTWRITE_TIMER_TIMEOUT_MS != 0) && (BTWRITE_ASSERT_TIMER == TRUE)
-		else
-		{
-			if (action == UPIO_ASSERT)
-			{
-				ALOGD("%s : begin enable lpm, lpm_proc_cb.timer_created = %d", __FUNCTION__, lpm_proc_cb.timer_created);
-				// create btwrite assertion holding timer
-				if (lpm_proc_cb.timer_created == FALSE)
-				{
-					int status;
-					struct sigevent se;
+        else
+        {
+            if (action == UPIO_ASSERT)
+            {
+                ALOGD("%s : begin enable lpm, lpm_proc_cb.timer_created = %d", __FUNCTION__, lpm_proc_cb.timer_created);
+                // create btwrite assertion holding timer
+                if (lpm_proc_cb.timer_created == FALSE)
+                {
+                    int status;
+                    struct sigevent se;
 
-					se.sigev_notify = SIGEV_THREAD;
-					se.sigev_value.sival_ptr = &lpm_proc_cb.timer_id;
-					se.sigev_notify_function = proc_btwrite_timeout;
-					se.sigev_notify_attributes = NULL;
+                    se.sigev_notify = SIGEV_THREAD;
+                    se.sigev_value.sival_ptr = &lpm_proc_cb.timer_id;
+                    se.sigev_notify_function = proc_btwrite_timeout;
+                    se.sigev_notify_attributes = NULL;
 
-					status = timer_create(CLOCK_MONOTONIC, &se,
-							      &lpm_proc_cb.timer_id);
+                    status = timer_create(CLOCK_MONOTONIC, &se,
+                          &lpm_proc_cb.timer_id);
 
-					if (status == 0)
-						lpm_proc_cb.timer_created = TRUE;
-				}
-			}
-		}
+                    if (status == 0)
+                        lpm_proc_cb.timer_created = TRUE;
+                }
+            }
+        }
 #endif
 
-		if (fd >= 0)
-			close(fd);
+        if (fd >= 0)
+            close(fd);
 #endif
-		break;
+        break;
 
-	case UPIO_BT_WAKE:
-		if (upio_state[UPIO_BT_WAKE] == action)
-		{
-			UPIODBG("BT_WAKE is %s already", lpm_state[action]);
-			return;
+    case UPIO_BT_WAKE:
+        if (upio_state[UPIO_BT_WAKE] == action)
+        {
+            UPIODBG("BT_WAKE is %s already", lpm_state[action]);
+            return;
 #if (BT_WAKE_VIA_PROC == TRUE) && (BTWRITE_ASSERT_TIMER == TRUE)
-			if (lpm_proc_cb.btwrite_active == TRUE)
-				/*
-				 * The proc btwrite node could have not been updated for
-				 * certain time already due to heavy downstream path flow.
-				 * In this case, we want to explicitly touch proc btwrite
-				 * node to keep the bt_wake assertion in the LPM kernel
-				 * driver. The current kernel bluesleep LPM code starts
-				 * a 10sec internal in-activity timeout timer before it
-				 * attempts to deassert BT_WAKE line.
-				 */
-				return;
+            if (lpm_proc_cb.btwrite_active == TRUE)
+            /*
+             * The proc btwrite node could have not been updated for
+             * certain time already due to heavy downstream path flow.
+             * In this case, we want to explicitly touch proc btwrite
+             * node to keep the bt_wake assertion in the LPM kernel
+             * driver. The current kernel bluesleep LPM code starts
+             * a 10sec internal in-activity timeout timer before it
+             * attempts to deassert BT_WAKE line.
+             */
+            return;
 #else
-			return;
+            return;
 #endif
-		}
+        }
 
-		upio_state[UPIO_BT_WAKE] = action;
+        upio_state[UPIO_BT_WAKE] = action;
 
 #if (BT_WAKE_VIA_USERIAL_IOCTL == TRUE)
 
-		userial_vendor_ioctl(((action == UPIO_ASSERT) ? \
-				      USERIAL_OP_ASSERT_BT_WAKE : USERIAL_OP_DEASSERT_BT_WAKE), \
-				     NULL);
+        userial_vendor_ioctl(((action == UPIO_ASSERT) ? \
+              USERIAL_OP_ASSERT_BT_WAKE : USERIAL_OP_DEASSERT_BT_WAKE), \
+             NULL);
 
 #elif (BT_WAKE_VIA_PROC == TRUE)
 
-		/*
-		 *  Kick proc btwrite node only at UPIO_ASSERT
-		 */
+        /*
+         *  Kick proc btwrite node only at UPIO_ASSERT
+         */
 #if (BT_WAKE_VIA_PROC_NOTIFY_DEASSERT == FALSE)
-		if (action == UPIO_DEASSERT)
-			return;
+        if (action == UPIO_DEASSERT)
+            return;
 #endif
-		ALOGD("begin open btwrite.");
-		fd = open(VENDOR_BTWRITE_PROC_NODE, O_WRONLY);
+        ALOGD("begin open btwrite.");
+        fd = open(VENDOR_BTWRITE_PROC_NODE, O_WRONLY);
 
-		if (fd < 0)
-		{
-			ALOGE("upio_set : open(%s) for write failed: %s (%d)",
-			      VENDOR_BTWRITE_PROC_NODE, strerror(errno), errno);
-			return;
-		}
+        if (fd < 0)
+        {
+            ALOGE("upio_set : open(%s) for write failed: %s (%d)",
+                  VENDOR_BTWRITE_PROC_NODE, strerror(errno), errno);
+            return;
+        }
 #if (BT_WAKE_VIA_PROC_NOTIFY_DEASSERT == TRUE)
-		if (action == UPIO_DEASSERT)
-			buffer = '0';
-		else
+        if (action == UPIO_DEASSERT)
+            buffer = '0';
+        else
 #endif
-		buffer = '1';
+        buffer = '1';
 
-		if (write(fd, &buffer, 1) < 0)
-		{
-			ALOGE("upio_set : write(%s) failed: %s (%d)",
-			      VENDOR_BTWRITE_PROC_NODE, strerror(errno), errno);
-			close(fd);
-			return;
-		}
+        if (write(fd, &buffer, 1) < 0)
+        {
+            ALOGE("upio_set : write(%s) failed: %s (%d)",
+                  VENDOR_BTWRITE_PROC_NODE, strerror(errno), errno);
+            close(fd);
+            return;
+        }
 
-		ALOGD("write btwrite successfully.");
-		ms_delay(50);
+        ALOGD("write btwrite successfully.");
+        ms_delay(50);
 
 #if (BTWRITE_ASSERT_TIMER == TRUE) && (PROC_BTWRITE_TIMER_TIMEOUT_MS != 0)
-		/* arm user space timer based on action */
-		upio_start_stop_timer(action);
+        /* arm user space timer based on action */
+        upio_start_stop_timer(action);
 #endif
 
 #if (BTWRITE_ASSERT_TIMER == TRUE)
-		UPIODBG("%s: proc btwrite assertion, buffer: %c, timer_armed %d %d",
-			__FUNCTION__, buffer, lpm_proc_cb.btwrite_active, lpm_proc_cb.timer_created);
+        UPIODBG("%s: proc btwrite assertion, buffer: %c, timer_armed %d %d",
+            __FUNCTION__, buffer, lpm_proc_cb.btwrite_active, lpm_proc_cb.timer_created);
 #endif
-		if (fd >= 0)
-			close(fd);
+        if (fd >= 0)
+            close(fd);
 #endif
 
-		break;
+        break;
 
-	case UPIO_HOST_WAKE:
-		UPIODBG("upio_set: UPIO_HOST_WAKE");
-		break;
-	}
+    case UPIO_HOST_WAKE:
+        UPIODBG("upio_set: UPIO_HOST_WAKE");
+        break;
+    }
 }

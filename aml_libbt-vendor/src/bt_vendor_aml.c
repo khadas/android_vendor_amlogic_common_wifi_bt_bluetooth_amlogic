@@ -106,16 +106,6 @@ void vnd_load_conf(const char *p_path);
 extern void ms_delay(uint32_t timeout);
 extern unsigned int state;
 unsigned int hw_state = 0;
-void aml_15p4_deinit(void);
-void aml_15p4_handle(void);
-extern void aml_15p4_tx(unsigned char *data, unsigned short len);
-static bool exit_thread;
-pthread_t aml_15p4_handle_thread;
-#define rev_15p4_cmd_fifo "/data/vendor/bluetooth/fifo_cmd_out"
-#define rsp_15p4_rst_fifo "/data/vendor/bluetooth/fifo_cmd_in"
-
-static int S15P4_RF;
-static int S15P4_WF;
 
 enum
 {
@@ -627,26 +617,6 @@ static void amlbt_transtype_check_by_persist(void)
         ALOGD("[AML_BT] W2U Chip type(%d:%d:%d)\n", amlbt_transtype.family_id,
               amlbt_transtype.family_rev, amlbt_transtype.interface);
     }
-    else if (strcmp("aml_w2l_u", property) == 0)
-    {
-        amlbt_transtype.interface = AML_INTF_USB;
-        amlbt_transtype.wireless = 0;
-        amlbt_transtype.family_rev = AML_REV_A;
-        amlbt_transtype.family_id = AML_W2L;
-        amlbt_transtype.reserved = 0;
-        ALOGD("[AML_BT] W2LU Chip type(%d:%d:%d)\n", amlbt_transtype.family_id,
-              amlbt_transtype.family_rev, amlbt_transtype.interface);
-    }
-    else if (strcmp("aml_w2l_s", property) == 0)
-    {
-        amlbt_transtype.interface = AML_INTF_SDIO;
-        amlbt_transtype.wireless = 0;
-        amlbt_transtype.family_rev = AML_REV_A;
-        amlbt_transtype.family_id = AML_W2L;
-        amlbt_transtype.reserved = 0;
-        ALOGD("[AML_BT] W2LS Chip type(%d:%d:%d)\n", amlbt_transtype.family_id,
-              amlbt_transtype.family_rev, amlbt_transtype.interface);
-    }
     else
     {
         ALOGD("[AML_BT] No Chip persist\n");
@@ -690,13 +660,6 @@ static void amlbt_usb_driver_load(void)
             insmod("/vendor/lib/modules/w2_comm.ko", "bus_type=usb", "w2_comm", 200);
             //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
         }
-        else if (amlbt_transtype.family_id == AML_W2L
-                 && amlbt_transtype.interface == AML_INTF_USB)
-        {
-            rmmod("wifi_comm", 400);
-            insmod("/vendor/lib/modules/w2l_comm.ko", "bus_type=usb", "w2l_comm", 200);
-            //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
-        }
         //memset(value, 0, sizeof(value));
         /* Note: you need disable selinux and gives chmod permission for
         ** driver files when specify the path of driver.
@@ -706,45 +669,6 @@ static void amlbt_usb_driver_load(void)
         {
             insmod("/vendor/lib/modules/aml_bt.ko", driver_pram, "aml_bt", 200);
         }
-        /*
-        if (property_get("persist.vendor.wifibt_drv_path", value, NULL))
-        {
-            memset(buf, 0, sizeof(buf));
-            snprintf(buf, sizeof(buf), "fw_path=%s", value);
-            if (amlbt_transtype.family_id == AML_W1U
-                    && amlbt_transtype.interface == AML_INTF_USB)
-            {
-                insmod("/vendor/lib/modules/w1u_bt.ko", driver_pram, "w1u_bt", 200);
-            }
-            else if (amlbt_transtype.family_id == AML_W2
-                     && amlbt_transtype.interface == AML_INTF_USB)
-            {
-                insmod("/vendor/lib/modules/w2_bt.ko", driver_pram, "w2_bt", 200);
-            }
-            else if (amlbt_transtype.family_id == AML_W2L
-                     && amlbt_transtype.interface == AML_INTF_USB)
-            {
-                insmod("/vendor/lib/modules/w2l_bt.ko", driver_pram, "w2l_bt", 200);
-            }
-        }
-        else
-        {
-            if (amlbt_transtype.family_id == AML_W1U
-                    && amlbt_transtype.interface == AML_INTF_USB)
-            {
-                insmod("/vendor/lib/modules/w1u_bt.ko", driver_pram, "w1u_bt", 200);
-            }
-            else if (amlbt_transtype.family_id == AML_W2
-                     && amlbt_transtype.interface == AML_INTF_USB)
-            {
-                insmod("/vendor/lib/modules/w2_bt.ko", driver_pram, "w2_bt", 200);
-            }
-            else if (amlbt_transtype.family_id == AML_W2L
-                     && amlbt_transtype.interface == AML_INTF_USB)
-            {
-                insmod("/vendor/lib/modules/w2l_bt.ko", driver_pram, "w2l_bt", 200);
-            }
-        }*/
     }
     else
     {
@@ -884,8 +808,9 @@ static void property_get_state(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2024-0402-2020\n");
-    ALOGI("Ib9f3195d65a91ae945df4bd28f4f4a7dae2948da\n");
+    ALOGI("amlbt init 0x2024-0510-1720\n");
+    ALOGI("Iae08fd15ed59fb9a89a923bfa2383c7f7777e511\n");
+    ALOGI("release commit:107bb239f7f47bf3a425469e963f02cc8a99eb00 2024-05-10\n");
 
     if (p_cb == NULL)
     {
@@ -927,22 +852,16 @@ static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
     {
         bt_power = driver_check("aml_bt", 20);
     }
-    /*
-    else if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_USB)
-    {
-        bt_power = driver_check("w1u_bt", 20);
-    }
-    else if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface == AML_INTF_USB)
-    {
-        bt_power = driver_check("w2_bt", 20);
-    }
-    else if (amlbt_transtype.family_id == AML_W2L && amlbt_transtype.interface == AML_INTF_USB)
-    {
-        bt_power = driver_check("w2l_bt", 20);
-    }
-    */
+
     if (bt_power == 0 && amlbt_transtype.interface == AML_INTF_USB)
     {
+        if (upio_power_get() == 0)
+        {
+            ALOGD("bt only, set bt power begin");
+            upio_set_bluetooth_power(UPIO_BT_POWER_ON);
+            ALOGD("bt only, set bt power end");
+            usleep(300000);  //waiting usb device enumerate
+        }
         amlbt_usb_driver_load();
     }
     userial_vendor_init();
@@ -1563,42 +1482,9 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     {
                         bt_power = 0;
                         upio_set_bluetooth_power(UPIO_BT_POWER_OFF);
-
-                        if (amlbt_transtype.family_id == AML_W2L &&
-                         amlbt_transtype.interface == AML_INTF_SDIO)
-                        {
-                            rmmod("aml_bt", 400);
-                            rmmod("w2l_comm", 400);
-                        }
                     }
                 }
                 ALOGD("bt_power %d", bt_power);
-                if ((amlbt_fw_mode == FW_MODE_COEX) && (amlbt_transtype.family_id == AML_W2L))
-                {
-                    exit_thread = true;
-                    aml_15p4_deinit();
-                }
-                /*if (!bt_power)
-                {
-                    if (amlbt_transtype.family_id == AML_W1)
-                    {
-                        rmmod("sdio_bt", 200);
-                        //usleep(500000);
-                    }
-                    else if (amlbt_transtype.family_id == AML_W1U)
-                    {
-                        rmmod("w1u_bt", 200);
-                        //usleep(500000);
-                    }
-                    else if (amlbt_transtype.family_id == AML_W2 &&
-                            (amlbt_transtype.interface == AML_INTF_PCIE || amlbt_transtype.interface == AML_INTF_SDIO))
-                    {
-                        rmmod("w2_bt", 200);
-                        //usleep(500000);
-                    }
-                    ALOGD("BT_VND_PWR_OFF rmmod end");
-                    upio_set_bluetooth_power(UPIO_BT_POWER_OFF);
-                }*/
             }
             else if (*state == BT_VND_PWR_ON)
             {
@@ -1606,9 +1492,9 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                 ALOGD("bt_power %d", bt_power);
                 if (upio_power_get() == 0)
                 {
-                    ALOGD("Upper level upio_power_get power failed");
+                    ALOGD("first, set bt power");
                     upio_set_bluetooth_power(UPIO_BT_POWER_ON);
-                    ALOGD("libbt set_bluetooth_power");
+                    ALOGD("end, set bt power");
                 }
                 rmmod("wifi_comm", 100);
                 if (bt_power == 0)
@@ -1651,38 +1537,6 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                         //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
                         insmod("/vendor/lib/modules/aml_bt.ko", driver_pram, "aml_bt", 200);
                     }
-                    else if (amlbt_transtype.family_id == AML_W2L &&
-                             amlbt_transtype.interface == AML_INTF_SDIO)
-                    {
-                        //rmmod("wifi_comm", 400);
-                        insmod("/vendor/lib/modules/w2l_comm.ko", "bus_type=sdio", "w2l_comm", 200);
-                        //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
-                        insmod("/vendor/lib/modules/aml_bt.ko", driver_pram, "aml_bt", 200);
-                    }
-                    else if (amlbt_transtype.family_id == AML_W2L &&
-                             amlbt_transtype.interface == AML_INTF_PCIE)
-                    {
-                        //rmmod("wifi_comm", 400);
-                        insmod("/vendor/lib/modules/w2l_comm.ko", "bus_type=pci", "w2l_comm", 200);
-                        //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
-                        insmod("/vendor/lib/modules/aml_bt.ko", driver_pram, "aml_bt", 200);
-                    }
-                    else if (amlbt_transtype.family_id == AML_W2L &&
-                             amlbt_transtype.interface == AML_INTF_USB)
-                    {
-                        //rmmod("wifi_comm", 400);
-                        insmod("/vendor/lib/modules/w2l_comm.ko", "bus_type=usb", "w2l_comm", 200);
-                        //insmod("/vendor/lib/modules/w2.ko", "", "w2", 200);
-                        insmod("/vendor/lib/modules/aml_bt.ko", driver_pram, "aml_bt", 200);
-                    }
-                }
-                if ((amlbt_fw_mode == FW_MODE_COEX) && (amlbt_transtype.family_id == AML_W2L))
-                {
-                    exit_thread = false;
-                    if (signal(SIGPIPE, sigpipeHandler) == SIG_ERR) {
-                        perror("Unable to register SIGPIPE handler");
-                    }
-                    pthread_create(&aml_15p4_handle_thread, NULL, aml_15p4_handle, NULL);
                 }
             }
         }
@@ -1771,10 +1625,10 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                         aml_reg_pum_power_cfg_clear(g_userial_fd);
                         //aml_woble_configure(g_userial_fd);
                     }
-                    else
+                    /*else
                     {
                         aml_poweroff_bt(g_userial_fd);
-                    }
+                    }*/
 
                     usleep(100000);
                     aml_reset_bt(g_userial_fd);
@@ -1839,10 +1693,10 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             {
                                 state = HW_REG_PUM_CLEAR;
                             }
-                            else
+                            /*else
                             {
                                 state = HW_CLEAR_LIST;
-                            }
+                            }*/
                             break;
                         }
                         retry_cnt++;
@@ -1863,7 +1717,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             retry_cnt++;
                         }while (state == HW_REG_PUM_CLEAR);
                     }
-                    else
+                   /* else
                     {
                         hw_poweroff_clear_list();
                         do
@@ -1876,7 +1730,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             }
                             retry_cnt++;
                         }while (state == HW_CLEAR_LIST);
-                    }
+                    }*/
                 }
             }
             if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_USB)
@@ -1946,116 +1800,6 @@ static void cleanup(void)
     upio_cleanup();
 
     bt_vendor_cbacks = NULL;
-}
-
-/* | HCI_ZIGBEE_FLAG | MHDL |           MID        | BODY LENGTH | checksum |
-*  |   0x10 1 Byts   | 0xFA | command id 1 Bytes   |    2 Bytes  |  2 Bytes |
-*/
-void aml_15p4_data_cb(unsigned char *p_mem)
-{
-    unsigned short len = ((p_mem[3] << 8) | p_mem[2]);
-    int size;
-    size = write(S15P4_WF, p_mem, len + 4 + 2);
-    if (size != len + 4 + 2)
-    {
-        ALOGI("%s packed error exit\n", __func__);
-        //exit(-1);
-    }
-}
-
-void aml_15p4_deinit(void)
-{
-    ALOGI("%s", __func__);
-    if (S15P4_WF != -1)
-    {
-        close(S15P4_WF);
-    }
-    if (S15P4_RF != -1)
-    {
-        close(S15P4_RF);
-    }
-}
-
-void aml_15p4_handle(void)
-{
-    int data_len;
-    unsigned int read_len = 0;
-    fd_set read_fd;
-    fd_set error_fd;
-    struct timeval timeout = {0, 500000};
-    int rval;
-    char thread_buf[AML_15P4_CMD_BUF_SIZE] = {0};
-    if (mkfifo(rev_15p4_cmd_fifo, S_IFIFO | 0775) < 0 && errno != EEXIST)
-    {
-        ALOGI("%s mkfifo cmd error %s", __func__, strerror(errno));
-        return;
-    }
-    if (mkfifo(rsp_15p4_rst_fifo, S_IFIFO | 0775) < 0 && errno != EEXIST)
-    {
-        ALOGI("%s mkfifo rst error %s", __func__, strerror(errno));
-        return;
-    }
-    S15P4_RF = open(rev_15p4_cmd_fifo, O_RDONLY);
-    if (S15P4_RF == -1)
-    {
-        ALOGI("%s can not open zigbee tx pipe error %s", __func__, strerror(errno));
-        return;
-    }
-    S15P4_WF = open(rsp_15p4_rst_fifo, O_WRONLY);
-    if (S15P4_WF == -1)
-    {
-        ALOGI("%s can not open zigbee rx pipe error %s", __func__, strerror(errno));
-        return;
-    }
-
-    FD_ZERO(&read_fd);
-    FD_SET(S15P4_RF, &read_fd);
-
-    while (exit_thread == false)
-    {
-        rval = select(S15P4_RF + 1, &read_fd, NULL, NULL, &timeout);
-        if (rval > 0)
-        {
-            if (FD_ISSET(S15P4_RF, &error_fd))
-            {
-                ALOGI("%s thread read file error exit\n", __func__);
-                exit(-1);
-            }
-            else if (FD_ISSET(S15P4_RF, &read_fd))
-            {
-                memset(thread_buf, 0, sizeof(thread_buf));
-                data_len = read(S15P4_RF, thread_buf, 5);
-                if (data_len < 0)
-                {
-                    ALOGI("%s read error exit %s\n", __func__, strerror(errno));
-                    exit(-1);
-                }
-                while (data_len && data_len < 5)
-                {
-                  read_len = read(S15P4_RF, &thread_buf[data_len], 5 - data_len);
-                  data_len += read_len;
-                }
-                if ((*(unsigned short*)&thread_buf[0]) == 0xfa10)
-                {
-                    ALOGD("15.4 head:len %d,[%#x,%#x,%#x,%#x,%#x]",data_len, thread_buf[0], thread_buf[1],
-                        thread_buf[2], thread_buf[3], thread_buf[4]);
-                    read_len = *(unsigned short*)&thread_buf[3];
-                    ALOGD("15p4 payload len = %d ", read_len);
-                    data_len = read(S15P4_RF, &thread_buf[5], read_len + 2);
-                    if (data_len > 0)
-                    {
-                        ALOGD("15p4 data len = %d ", read_len + 6);
-                        aml_15p4_tx(&thread_buf[1], read_len + 6);
-                    }
-                }
-            }
-        }
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 500000;
-        FD_ZERO(&read_fd);
-        FD_SET(S15P4_RF, &read_fd);
-    }
-    ALOGI("exit aml_thread thread");
 }
 
 // Entry point of DLib

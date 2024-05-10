@@ -57,9 +57,9 @@ int hw_set_patch_settlement_delay(char *p_conf_name, char *p_conf_value, int par
 typedef int (conf_action_t)(char *p_conf_name, char *p_conf_value, int param);
 
 typedef struct {
-	const char *	conf_entry;
-	conf_action_t * p_action;
-	int		param;
+    const char * conf_entry;
+    conf_action_t * p_action;
+    int param;
 } conf_entry_t;
 
 unsigned int amlbt_poweron =AML_SDIO_EN;
@@ -68,6 +68,9 @@ unsigned int amlbt_btrecovery = 0;
 unsigned int amlbt_btsink = 0;
 unsigned int amlbt_rftype = 0;
 unsigned int amlbt_fw_mode = 0;
+unsigned int amlbt_pin_mux = 0;
+unsigned int amlbt_br_digit_gain = 0;
+unsigned int amlbt_edr_digit_gain = 0;
 
 /******************************************************************************
 **  Static variables
@@ -77,13 +80,13 @@ unsigned int amlbt_fw_mode = 0;
  * Current supported entries and corresponding action functions
  */
 static const conf_entry_t conf_table[] = {
-	{ "UartPort",		    userial_set_port,		   0 },
-	{ "FwPatchFilePath",	    hw_set_patch_file_path,	   0 },
-	{ "FwPatchFileName",	    hw_set_patch_file_name,	   0 },
+    { "UartPort",    userial_set_port,   0 },
+    { "FwPatchFilePath",    hw_set_patch_file_path,   0 },
+    { "FwPatchFileName",    hw_set_patch_file_name,   0 },
 #if (VENDOR_LIB_RUNTIME_TUNING_ENABLED == TRUE)
-	{ "FwPatchSettlementDelay", hw_set_patch_settlement_delay, 0 },
+    { "FwPatchSettlementDelay", hw_set_patch_settlement_delay, 0 },
 #endif
-	{ (const char *)NULL,	    NULL,			   0 }
+    { (const char *)NULL,    NULL,   0 }
 };
 
 
@@ -103,57 +106,57 @@ static const conf_entry_t conf_table[] = {
 *******************************************************************************/
 void vnd_load_conf(const char *p_path)
 {
-	FILE *p_file;
-	char *p_name;
-	char *p_value;
-	conf_entry_t *p_entry;
-	char line[CONF_MAX_LINE_LEN + 1]; /* add 1 for \0 char */
+    FILE *p_file;
+    char *p_name;
+    char *p_value;
+    conf_entry_t *p_entry;
+    char line[CONF_MAX_LINE_LEN + 1]; /* add 1 for \0 char */
 
-	ALOGI("Attempt to load conf from %s", p_path);
+    ALOGI("Attempt to load conf from %s", p_path);
 
-	if ((p_file = fopen(p_path, "r")) != NULL)
-	{
-		/* read line by line */
-		while (fgets(line, CONF_MAX_LINE_LEN + 1, p_file) != NULL)
-		{
-			if (line[0] == CONF_COMMENT)
-				continue;
+    if ((p_file = fopen(p_path, "r")) != NULL)
+    {
+        /* read line by line */
+        while (fgets(line, CONF_MAX_LINE_LEN + 1, p_file) != NULL)
+        {
+            if (line[0] == CONF_COMMENT)
+                continue;
 
-			p_name = strtok(line, CONF_DELIMITERS);
+            p_name = strtok(line, CONF_DELIMITERS);
 
-			if (NULL == p_name)
-			{
-				continue;
-			}
+            if (NULL == p_name)
+            {
+                continue;
+            }
 
-			p_value = strtok(NULL, CONF_DELIMITERS);
+            p_value = strtok(NULL, CONF_DELIMITERS);
 
-			if (NULL == p_value)
-			{
-				ALOGW("vnd_load_conf: missing value for name: %s", p_name);
-				continue;
-			}
+            if (NULL == p_value)
+            {
+                ALOGW("vnd_load_conf: missing value for name: %s", p_name);
+                continue;
+            }
 
-			p_entry = (conf_entry_t *)conf_table;
+            p_entry = (conf_entry_t *)conf_table;
 
-			while (p_entry->conf_entry != NULL)
-			{
-				if (strcmp(p_entry->conf_entry, (const char *)p_name) == 0)
-				{
-					p_entry->p_action(p_name, p_value, p_entry->param);
-					break;
-				}
+            while (p_entry->conf_entry != NULL)
+            {
+                if (strcmp(p_entry->conf_entry, (const char *)p_name) == 0)
+                {
+                    p_entry->p_action(p_name, p_value, p_entry->param);
+                    break;
+                }
 
-				p_entry++;
-			}
-		}
+                p_entry++;
+            }
+        }
 
-		fclose(p_file);
-	}
-	else
-	{
-		ALOGI("vnd_load_conf file >%s< not found", p_path);
-	}
+        fclose(p_file);
+    }
+    else
+    {
+        ALOGI("vnd_load_conf file >%s< not found", p_path);
+    }
 }
 
 static char *aml_trim(char *str) {
@@ -188,7 +191,7 @@ void load_aml_stack_conf()
     //char value[1024];
     while (fgets(line, sizeof(line), fp)) {
         char *line_ptr = aml_trim(line);
-		char line_f[100];
+        char line_f[100];
         ++line_num;
 
         // Skip blank and comment lines.
@@ -200,17 +203,17 @@ void load_aml_stack_conf()
             ALOGE("%s no key/value separator found on line %d.", __func__, line_num);
             continue;
         }
-		strncpy(line_f,line_ptr,strlen(line_ptr)-strlen(split));
+        strncpy(line_f,line_ptr,strlen(line_ptr)-strlen(split));
        // *split = '\0';
-       ALOGE("%s  %s  %s", __func__, aml_trim(line_f), aml_trim(split+1));
+        ALOGE("%s  %s  %s", __func__, aml_trim(line_f), aml_trim(split+1));
         char *endptr;
         if (!strcmp(aml_trim(line_f), "BtPowerOn")) {
             amlbt_poweron = strtol(aml_trim(split+1), &endptr, 0);
-			ALOGE("%s amlbt_poweron '%d'", __func__, amlbt_poweron);
+            ALOGE("%s amlbt_poweron '%d'", __func__, amlbt_poweron);
         }
         else if(!strcmp(aml_trim(line_f), "BtChip")) {
             amlbt_chiptype = strtol(aml_trim(split+1), &endptr, 0);
-			ALOGE("%s amlbt_chiptype '%d'", __func__, amlbt_chiptype);
+            ALOGE("%s amlbt_chiptype '%d'", __func__, amlbt_chiptype);
         }
         else if (!strcmp(aml_trim(line_f), "BtRecovery")) {
             amlbt_btrecovery = strtol(aml_trim(split+1), &endptr, 0);
@@ -227,6 +230,18 @@ void load_aml_stack_conf()
         else if (!strcmp(aml_trim(line_f), "FirmwareMode")) {
             amlbt_fw_mode = strtol(aml_trim(split+1), &endptr, 0);
             ALOGE("%s amlbt_fw_mode '%d'", __func__, amlbt_fw_mode);
+        }
+        else if (!strcmp(aml_trim(line_f), "ChangePinMux")) {
+            amlbt_pin_mux = strtol(aml_trim(split+1), &endptr, 0);
+            ALOGE("%s amlbt_pin_mux '%d'", __func__, amlbt_pin_mux);
+        }
+        else if (!strcmp(aml_trim(line_f), "BrDigitGain")) {
+            amlbt_br_digit_gain = strtol(aml_trim(split+1), &endptr, 0);
+            ALOGE("%s amlbt_br_digit_gain '%#x'", __func__, amlbt_br_digit_gain);
+        }
+        else if (!strcmp(aml_trim(line_f), "EdrDigitGain")) {
+            amlbt_edr_digit_gain = strtol(aml_trim(split+1), &endptr, 0);
+            ALOGE("%s amlbt_edr_digit_gain '%#x'", __func__, amlbt_edr_digit_gain);
         }
     }
     fclose(fp);
