@@ -24,6 +24,10 @@
 
 #include "amlbt.h"
 #include <linux/amlogic/pm.h>
+#ifdef  CONFIG_COMPAT
+#include <linux/compat.h>
+#endif
+
 
 //#define BT_USB_DBG
 #define BT_USB_MAX_PRIO                        0xFFFFFFFF
@@ -42,7 +46,7 @@ static unsigned int dbg_credit = 8;
 static unsigned int dbg_cnt = 0;
 #endif
 
-#define AML_BT_VERSION  (0x20240510)
+#define AML_BT_VERSION  (0x20240522)
 
 #define BT_EP           (USB_EP2)
 
@@ -3138,9 +3142,9 @@ static long btuartchr_ioctl(struct file* filp, unsigned int cmd, unsigned long a
 {
     unsigned long coex_time = 0;
     unsigned int reg_value = 0;
-    BTD("arg value %ld", arg);
-    BTD("cmd type=%c\t nr=%d\t dir=%d\t size=%d\n", _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_DIR(cmd), _IOC_SIZE(cmd));
-    BTD("cmd value %ld", cmd);
+    BTI("arg value %ld", arg);
+    BTI("cmd type=%c\t nr=%d\t dir=%d\t size=%d\n", _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_DIR(cmd), _IOC_SIZE(cmd));
+    BTI("cmd value %ld", cmd);
     switch (cmd)
     {
         case IOCTL_SET_BT_COEX_TIME:
@@ -3687,6 +3691,24 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
     return 0;
 }
 
+#ifdef CONFIG_COMPAT
+static long btusbchr_compat_ioctl(struct file* filp, unsigned int cmd, unsigned long arg)
+{
+    long ret = 0;
+
+    ret = btusbchr_ioctl(filp, cmd, (unsigned long)compat_ptr(arg));
+    return ret;
+}
+
+static long btuartchr_compat_ioctl(struct file* filp, unsigned int cmd, unsigned long arg)
+{
+    long ret = 0;
+
+    ret = btuartchr_ioctl(filp, cmd, (unsigned long)compat_ptr(arg));
+    return ret;
+}
+#endif
+
 static struct file_operations amlbt_usb_fops  =
 {
     .open = amlbt_usb_char_open,
@@ -3694,8 +3716,10 @@ static struct file_operations amlbt_usb_fops  =
     .read = amlbt_usb_char_read,
     .write = amlbt_usb_char_write,
     .poll = btchr_poll,
-    //.unlocked_ioctl = btchr_ioctl,
-    .compat_ioctl = btusbchr_ioctl,
+    .unlocked_ioctl = btusbchr_ioctl,
+#ifdef CONFIG_COMPAT
+    .compat_ioctl = btusbchr_compat_ioctl,
+#endif
 };
 
 static int amlbt_usb_char_init(void)
@@ -4178,9 +4202,11 @@ const struct file_operations amlbt_sdio_fops =
     .release    = amlbt_sdio_fops_close,
     .write      = amlbt_sdio_char_write,
     .read      = amlbt_sdio_char_read,
-    .compat_ioctl = btuartchr_ioctl,
     .poll       = NULL,
-    //.unlocked_ioctl = NULL,
+    .unlocked_ioctl = btuartchr_ioctl,
+#ifdef CONFIG_COMPAT
+    .compat_ioctl = btuartchr_compat_ioctl,
+#endif
     .fasync     = NULL
 };
 
