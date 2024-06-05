@@ -9,6 +9,7 @@
 #include <linux/usb.h>
 #include <linux/cdev.h>
 #include <linux/ioctl.h>
+#include <linux/compat.h>
 #include <linux/io.h>
 #include <linux/firmware.h>
 #include <linux/vmalloc.h>
@@ -24,10 +25,6 @@
 
 #include "amlbt.h"
 #include <linux/amlogic/pm.h>
-#ifdef  CONFIG_COMPAT
-#include <linux/compat.h>
-#endif
-
 
 //#define BT_USB_DBG
 #define BT_USB_MAX_PRIO                        0xFFFFFFFF
@@ -46,7 +43,7 @@ static unsigned int dbg_credit = 8;
 static unsigned int dbg_cnt = 0;
 #endif
 
-#define AML_BT_VERSION  (0x20240522)
+#define AML_BT_VERSION  (0x20240604)
 
 #define BT_EP           (USB_EP2)
 
@@ -57,7 +54,7 @@ static unsigned int dbg_cnt = 0;
 #define REG_DEV_RESET           0xf03058
 #define REG_PMU_POWER_CFG       0xf03040
 #define REG_RAM_PD_SHUTDWONW_SW 0xf03050
-#define REG_FW_MODE             0x00f000e0
+#define REG_FW_MODE             0xf000e0
 
 #define BIT_PHY                 1
 #define BIT_MAC                 (1 << 1)
@@ -146,6 +143,8 @@ static unsigned int iccm_base_addr = 0;
 static unsigned int dccm_base_addr = 0;
 static unsigned int close_state = 0;
 static struct task_struct *check_fw_rx_stask = NULL;
+static s64 poll_last = 0;
+static s64 get_last = 0;
 
 static unsigned char cmd[4][2] = {{0xf2, 0xfe}, {0xf1, 0xfe}, {0xf0, 0xfe}, {0xf3, 0xfe}};
 static unsigned char cmd_cpt[64] = {0x04, 0x0e, 0x04, 0x01, 0x98, 0xfc, 0x00};
@@ -162,10 +161,19 @@ extern struct usb_device *g_udev;
 extern int auc_send_cmd_ep1(unsigned int addr, unsigned int len);
 extern uint32_t aml_pci_read_for_bt(int base, u32 offset);
 extern void aml_pci_write_for_bt(u32 val, int base, u32 offset);
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
 extern unsigned int get_resume_method(void);
+#endif
 extern int bt_wt_ptr;
 extern int bt_rd_ptr;
 static unsigned long bt_wt_ptr_local;
+#ifndef FALSE
+#define FALSE  0
+#endif
+
+#ifndef TRUE
+#define TRUE   (!FALSE)
+#endif
 
 int amlbt_usb_check_fw_rx(void *data);
 DECLARE_WAIT_QUEUE_HEAD(poll_amlbt_queue);
@@ -200,7 +208,7 @@ static unsigned int fw_cmd_r = 0;
 #define DATA_INDEX_SIZE          128
 #define EVT_FIFO_SIZE           8*1024
 #define TYPE_FIFO_SIZE          1024
-
+#define PRINTK_TIME             10000000000
 //static struct task_struct *check_fw_rx_stask = NULL;
 
 static dev_t bt_devid; /* bt char device number */
@@ -267,6 +275,7 @@ enum
     LOG_LEVEL_ERROR,
     LOG_LEVEL_WARN,
     LOG_LEVEL_INFO,
+    LOG_LEVEL_POINT,
     LOG_LEVEL_DEBUG,
     LOG_LEVEL_ALL,
 };
@@ -276,6 +285,7 @@ static int g_dbg_level = LOG_LEVEL_INFO;
 #define BTA(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_ALL) printk(KERN_INFO "BTA:" fmt, ## arg)
 #define BTD(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_DEBUG) printk(KERN_INFO "BTD:" fmt, ## arg)
 #define BTI(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_INFO) printk(KERN_INFO "BTI:" fmt, ## arg)
+#define BTP(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_POINT) printk(KERN_INFO "BTP:" fmt, ## arg)
 #define BTW(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_WARN) printk(KERN_INFO "BTW:" fmt, ## arg)
 #define BTE(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_ERROR) printk(KERN_INFO "BTE:" fmt, ## arg)
 #define BTF(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_FATAL) printk(KERN_INFO "BTF:" fmt, ## arg)
@@ -1386,7 +1396,7 @@ static void amlbt_usb_send_hci_cmd(unsigned char *data, unsigned int len)
     {
         amlbt_usb_write_word(WF_SRAM_CMD_FIFO_W_ADDR, (unsigned long)g_cmd_fifo->w & 0xfff, BT_EP);
     }
-    BTD("len %#x:w %#lx, r %#lx\n", len, (unsigned long)g_cmd_fifo->w, (unsigned long)g_cmd_fifo->r);
+    BTP("len %#x:w %#lx, r %#lx\n", len, (unsigned long)g_cmd_fifo->w, (unsigned long)g_cmd_fifo->r);
 }
 unsigned int gdsl_fifo_update_r(gdsl_fifo_t *p_fifo, unsigned int len)
 {
@@ -2151,7 +2161,7 @@ static int amlbt_usb_char_close(struct inode *inode_p, struct file *file_p)
 
     if (g_event_fifo != 0)
     {
-        BTI("event w:%p,r:%p\n", g_event_fifo->w, g_event_fifo->r);
+        BTI("event w:%#lx,r:%#lx\n", g_event_fifo->w, g_event_fifo->r);
     }
 
     if (download_fw)
@@ -2413,7 +2423,7 @@ static int amlbt_usb_get_data_w1u(void)
     return 0;
 }
 
-static int amlbt_usb_get_data(void)
+static int amlbt_usb_get_data(bool val)
 {
     unsigned int read_len = 0;
     unsigned char data_index[USB_RX_INDEX_FIFO_LEN] = {0};
@@ -2428,26 +2438,50 @@ static int amlbt_usb_get_data(void)
     unsigned char read_reg[16] = {0};
     gdsl_fifo_t read_fifo = {0};
     unsigned char *p_data = NULL;
+    s64 get_now = 0;
 
+    get_now = ktime_to_ns(ktime_get_real());
     USB_BEGIN_LOCK();
 
     amlbt_usb_read_sram_ext(&bt_usb_data_buf[0], (unsigned char *)(unsigned long)hci_rx_type_rd_ptr, USB_POLL_TOTAL_LEN, BT_EP);
-
-    if (bt_recovery)
-    {
-        USB_END_LOCK();
-        return -EFAULT;
-    }
     //1. process type
     w_point = ((bt_usb_data_buf[35]<<24)|(bt_usb_data_buf[34]<<16)|(bt_usb_data_buf[33]<<8)|bt_usb_data_buf[32]);
     g_event_fifo->w = (unsigned char *)(unsigned long)((bt_usb_data_buf[39]<<24)|(bt_usb_data_buf[38]<<16)|(bt_usb_data_buf[37]<<8)|bt_usb_data_buf[36]);
     g_rx_fifo->w = (unsigned char *)(unsigned long)((bt_usb_data_buf[31]<<24)|(bt_usb_data_buf[30]<<16)|(bt_usb_data_buf[29]<<8)|bt_usb_data_buf[28]);
     g_rx_type_fifo->w = (unsigned char *)w_point;
+    if (val == TRUE)
+    {
+        BTF("%s g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTF("%s g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
+        BTF("%s g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
+        BTF("%s g_fw_type_fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_fw_type_fifo->w, (unsigned long)g_fw_type_fifo->r);
+        BTF("%s g_fw_evt_fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_fw_evt_fifo->w, (unsigned long)g_fw_evt_fifo->r);
+        BTF("%s g_fw_data_fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_fw_data_fifo->w, (unsigned long)g_fw_data_fifo->r);
+    }
+    if (abs(get_now - get_last) >= PRINTK_TIME)
+    {
+        get_last = get_now;
+        BTI("gettype w:%#x r:%#x", g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTI("getevt w:%#x r:%#x", g_event_fifo->w, g_event_fifo->r);
+        BTI("getdata w:%#x r:%#x", g_rx_fifo->w, g_rx_fifo->r);
+    }
+
+    if (bt_recovery)
+    {
+        USB_END_LOCK();
+        BTF("%s1 g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTF("%s1 g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
+        BTF("%s1 g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
+        return -EFAULT;
+    }
     if (((unsigned long)g_rx_type_fifo->w > USB_RX_TYPE_FIFO_LEN) ||
             ((unsigned long)g_event_fifo->w > USB_POLL_TOTAL_LEN) ||
                 ((unsigned long)g_rx_fifo->w > USB_RX_Q_LEN*4))
     {
         fwdead_value = 1;
+        BTF("%s2 g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTF("%s2 g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
+        BTF("%s2 g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
         return -EFAULT;
     }
 
@@ -2532,13 +2566,13 @@ static int amlbt_usb_get_data(void)
     type_size = gdsl_fifo_get_data(&read_fifo, type_buff, sizeof(type_buff));
     if (type_buff[0] != 0x2 && type_buff[0] != 0x4 && type_buff[0] != 0x10)
     {
-        BTE("%s g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTE("%s3 g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
         g_event_fifo->w = (unsigned char *)(unsigned long)((bt_usb_data_buf[39]<<24)|(bt_usb_data_buf[38]<<16)|(bt_usb_data_buf[37]<<8)|bt_usb_data_buf[36]);
-        BTE("%s g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
+        BTE("%s3 g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
         g_rx_fifo->w = (unsigned char *)(unsigned long)((bt_usb_data_buf[31]<<24)|(bt_usb_data_buf[30]<<16)|(bt_usb_data_buf[29]<<8)|bt_usb_data_buf[28]);
-        BTE("%s g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
+        BTE("%s3 g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
     }
-    BTD("type fifo:w %#lx, r %#lx\n", (unsigned long)g_rx_type_fifo->w, (unsigned long)g_rx_type_fifo->r);
+    BTP("type fifo:w %#lx, r %#lx\n", (unsigned long)g_rx_type_fifo->w, (unsigned long)g_rx_type_fifo->r);
     if (type_size)
     {
         g_rx_type_fifo->r = read_fifo.r;
@@ -2547,6 +2581,10 @@ static int amlbt_usb_get_data(void)
     }
     else
     {
+        BTF("%s4 g_rx_type_fifo->w:%#x g_rx_type_fifo->r:%#x", __func__, g_rx_type_fifo->w, g_rx_type_fifo->r);
+        BTF("%s4 g_event_fifo->w:%#x g_event_fifo->r:%#x", __func__, g_event_fifo->w, g_event_fifo->r);
+        BTF("%s4 g_rx_fifo->w:%#x g_rx_fifo->r:%#x", __func__, g_rx_fifo->w, g_rx_fifo->r);
+        BTF("TYPE:%d [%#x,%#x,%#x,%#x]\n", type_size, type_buff[0], type_buff[4], type_buff[8], type_buff[12]);
         return -EFAULT;
     }
     //2. process data
@@ -2556,6 +2594,7 @@ static int amlbt_usb_get_data(void)
     read_fifo.w = g_rx_fifo->w;
     read_fifo.size = USB_RX_INDEX_FIFO_LEN;
     data_size = gdsl_fifo_get_data(&read_fifo, data_index, sizeof(data_index));
+    BTP("data fifo:w %#lx, r %#lx\n", (unsigned long)g_rx_fifo->w, (unsigned long)g_rx_fifo->r);
     if (data_size)
     {
         g_rx_fifo->r = read_fifo.r;
@@ -2593,10 +2632,19 @@ static int amlbt_usb_get_data(void)
         read_fifo.size = USB_EVENT_Q_LEN;
         evt_size = gdsl_fifo_get_data(&read_fifo, fw_read_buff, sizeof(fw_read_buff));
     }
+    BTP("evt fifo:w %#lx, r %#lx\n", (unsigned long)g_event_fifo->w, (unsigned long)g_event_fifo->r);
     if (evt_size)
     {
         g_event_fifo->r = read_fifo.r;
         gdsl_fifo_copy_data(g_fw_evt_fifo, fw_read_buff, evt_size);
+    }
+
+    if (!data_size && !evt_size)
+    {
+        BTF("%s5 g_fw_type_fifo->w:%#x g_fw_type_fifo->r:%#x", __func__, g_fw_type_fifo->w, g_fw_type_fifo->r);
+        BTF("%s5 g_fw_evt_fifo->w:%#x g_fw_evt_fifo->r:%#x", __func__, g_fw_evt_fifo->w, g_fw_evt_fifo->r);
+        BTF("%s5 g_fw_data_fifo->w:%#x g_fw_data_fifo->r:%#x", __func__, g_fw_data_fifo->w, g_fw_data_fifo->r);
+        BTF("%s5 data_size:%#x evt_size:%#x", __func__, data_size, evt_size);
     }
     //complete(&data_completion);
     //printk("[r:%#x w:%#x]", g_rx_type_fifo->r, g_rx_type_fifo->w);
@@ -2611,6 +2659,9 @@ int amlbt_usb_check_fw_rx(void *data)
 
     s64 last = ktime_to_ns(ktime_get_real());
     s64 now = 0;
+    s64 cnt_last = last;
+    get_last = last;
+    poll_last = last;
 
     while (!kthread_should_stop())
     {
@@ -2640,6 +2691,15 @@ int amlbt_usb_check_fw_rx(void *data)
         mutex_lock(&fw_type_fifo_mutex);
         fw_type = gdsl_fifo_used(g_fw_type_fifo);
         mutex_unlock(&fw_type_fifo_mutex);
+
+        now = ktime_to_ns(ktime_get_real());
+        if (abs(now - cnt_last) >= PRINTK_TIME)
+        {
+            cnt_last = now;
+            BTI("task %d|%#x|%#x|%#x", abs(now - last), bt_wt_ptr, bt_rd_ptr, bt_wt_ptr_local);
+            BTI("fw_type %#x w:%#x r:%#x", fw_type, (unsigned long)g_fw_type_fifo->w, (unsigned long)g_fw_type_fifo->w);
+        }
+
         if (fw_type)
         {
             BTD("%s fw_type1 %#x\n", __func__, fw_type);
@@ -2648,15 +2708,14 @@ int amlbt_usb_check_fw_rx(void *data)
         }
         if (!suspend_value)
         {
-            now = ktime_to_ns(ktime_get_real());
-
-            if ((abs(now - last) >= 3000000) || (((bt_wt_ptr & 0x1fff) != (bt_rd_ptr & 0x1fff)) && (bt_wt_ptr_local < bt_wt_ptr)))
+            //now = ktime_to_ns(ktime_get_real());
+            if ((abs(now - last) >= 5500000) || (((bt_wt_ptr & 0x1fff) != (bt_rd_ptr & 0x1fff)) && (bt_wt_ptr_local < bt_wt_ptr)))
             //if ((abs(now - last) >= 12000000))
             {
                 last = now;
                 if (FAMILY_TYPE_IS_W2(amlbt_if_type))
                 {
-                    amlbt_usb_get_data();
+                    amlbt_usb_get_data(FALSE);
                 }
                 else
                 {
@@ -2689,7 +2748,7 @@ int amlbt_usb_check_fw_rx(void *data)
             }
             else
             {
-                usleep_range(3000, 3000);
+                usleep_range(5000, 5000);
             }
         }
     }
@@ -2787,7 +2846,7 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
                 read_len -= 1;
                 read_len = ((read_len + 3) & 0xFFFFFFFC);
                 gdsl_fifo_get_data(g_fw_evt_fifo, &host_read_buff[4], read_len);
-                BTD("E:[%#x|%#x|%#x|%#x|%#x|%#x|%#x|%#x]\n", host_read_buff[0], host_read_buff[1],
+                BTP("E:[%#x|%#x|%#x|%#x|%#x|%#x|%#x|%#x]\n", host_read_buff[0], host_read_buff[1],
                        host_read_buff[2], host_read_buff[3],host_read_buff[4], host_read_buff[5],
                        host_read_buff[6], host_read_buff[7]);
                 if (close_state)
@@ -2986,6 +3045,10 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
         {
             amlbt_usb_write_word(RG_AON_A53, reg_value, BT_EP); //W2 used
         }
+        else if (offset == RG_AON_A59)
+        {
+            amlbt_usb_write_word(RG_AON_A59, reg_value, BT_EP); //W2 used
+        }
         else if (offset == REG_DEV_RESET)
         {
             download_end = 1;
@@ -3060,7 +3123,7 @@ static ssize_t amlbt_usb_char_write(struct file *file_p,
 
     if (count > 1 && w_type == HCI_COMMAND_PKT)
     {
-        BTD("hci cmd:[%#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x]",
+        BTP("hci cmd:[%#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x]",
             p_acl_buf[0],p_acl_buf[1],p_acl_buf[2],p_acl_buf[3],
             p_acl_buf[4],p_acl_buf[5],p_acl_buf[6],p_acl_buf[7]);
     }
@@ -3099,6 +3162,7 @@ static ssize_t amlbt_usb_char_write(struct file *file_p,
 unsigned int btchr_poll(struct file *file, poll_table *wait)
 {
     int mask = 0;
+    s64 poll_now = 0;
 
     if (!download_fw)
     {
@@ -3108,6 +3172,7 @@ unsigned int btchr_poll(struct file *file, poll_table *wait)
     BTD("poll \n");
     poll_wait(file, &poll_amlbt_queue, wait);
 
+    poll_now = ktime_to_ns(ktime_get_real());
 
     if ((evt_state))
     {
@@ -3116,6 +3181,9 @@ unsigned int btchr_poll(struct file *file, poll_table *wait)
     if ((g_auc_hif_ops.hi_write_word_for_bt == NULL) || (g_auc_hif_ops.hi_read_word_for_bt == NULL) ||
     (g_auc_hif_ops.hi_write_sram_for_bt == NULL) || (g_auc_hif_ops.hi_read_sram_for_bt == NULL))
     {
+        BTF("%s NULL type fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_rx_type_fifo->w, (unsigned long)g_rx_type_fifo->r);
+        BTF("%s NULL evt fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_event_fifo->w, (unsigned long)g_event_fifo->r);
+        BTF("%s NULL data fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_rx_fifo->w, (unsigned long)g_rx_fifo->r);
         return mask;
     }
     else if(g_fw_type_fifo->r != g_fw_type_fifo->w)
@@ -3128,8 +3196,24 @@ unsigned int btchr_poll(struct file *file, poll_table *wait)
         {
             mask |= POLLIN | POLLRDNORM;
         }
+        else
+        {
+            BTF("%s nodata type fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_fw_type_fifo->w, (unsigned long)g_fw_type_fifo->r);
+            BTF("%s nodata evt fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_fw_evt_fifo->w, (unsigned long)g_fw_evt_fifo->r);
+            BTF("%s nodata data fifo:w %#lx, r %#lx\n", __func__, (unsigned long)g_fw_data_fifo->w, (unsigned long)g_fw_data_fifo->r);
+            amlbt_usb_get_data(TRUE);
+        }
     }
-
+    else
+    {
+        if (abs(poll_now - poll_last) >= PRINTK_TIME)
+        {
+            poll_last = poll_now;
+            BTI("poll type fifo:w %#lx, r %#lx\n", (unsigned long)g_fw_type_fifo->w, (unsigned long)g_fw_type_fifo->r);
+            BTI("poll evt fifo:w %#lx, r %#lx\n", (unsigned long)g_fw_evt_fifo->w, (unsigned long)g_fw_evt_fifo->r);
+            BTI("poll data fifo:w %#lx, r %#lx\n", (unsigned long)g_fw_data_fifo->w, (unsigned long)g_fw_data_fifo->r);
+        }
+    }
     if (bt_recovery || fwdead_value)
     {
         mask |= POLLIN | POLLRDNORM;
@@ -3448,9 +3532,9 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
 {
     unsigned long coex_time = 0;
     unsigned int reg_value = 0;
-    BTD("arg value %ld", arg);
-    BTD("cmd type=%c\t nr=%d\t dir=%d\t size=%d\n", _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_DIR(cmd), _IOC_SIZE(cmd));
-    BTD("cmd value %ld", cmd);
+    BTI("arg value %ld", arg);
+    BTI("cmd type=%c\t nr=%d\t dir=%d\t size=%d\n", _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_DIR(cmd), _IOC_SIZE(cmd));
+    BTI("cmd value %ld", cmd);
     switch (cmd)
     {
         case IOCTL_GET_BT_DOWNLOAD_STATUS:
@@ -3690,7 +3774,6 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
     }
     return 0;
 }
-
 #ifdef CONFIG_COMPAT
 static long btusbchr_compat_ioctl(struct file* filp, unsigned int cmd, unsigned long arg)
 {
@@ -3708,7 +3791,6 @@ static long btuartchr_compat_ioctl(struct file* filp, unsigned int cmd, unsigned
     return ret;
 }
 #endif
-
 static struct file_operations amlbt_usb_fops  =
 {
     .open = amlbt_usb_char_open,
@@ -4397,6 +4479,7 @@ static int amlbt_sdio_resume(struct platform_device *dev)
 {
 #if 0
     unsigned int reg_value = 0;
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
     if ((get_resume_method() != RESUME_RTC_S) && (get_resume_method() != RESUME_RTC_C))
     {
         if (FAMILY_TYPE_IS_W2(amlbt_if_type) && INTF_TYPE_IS_SDIO(amlbt_if_type))
@@ -4416,6 +4499,7 @@ static int amlbt_sdio_resume(struct platform_device *dev)
             BTI("RG_AON_A52:%#x", aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A52));
         }
     }
+#endif
 #endif
     BTI("%s \n", __func__);
     return 0;
@@ -4454,7 +4538,7 @@ static void amlbt_usb_insmod(void)
 {
     // int ret = 0;
     BTI("BTAML version:%#x\n", AML_BT_VERSION);
-    BTI("release commit: 107bb239f7f47bf3a425469e963f02cc8a99eb00 2024-05-10\n");
+    BTI("release commit: 3d6a27323fa878809e49158ae75cc2ef1979a4c2 2024-06-05\n");
     BTI("++++++usb bt driver insmod start.++++++\n");
     BTI("------usb bt driver insmod end.------\n");
 
@@ -4587,6 +4671,7 @@ static int amlbt_usb_resume(struct platform_device *dev)
         suspend_value = 0;
     }
 #if 0
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
     if ((get_resume_method() != RESUME_RTC_S) && (get_resume_method() != RESUME_RTC_C))
     {
         if (FAMILY_TYPE_IS_W2(amlbt_if_type))
@@ -4599,12 +4684,14 @@ static int amlbt_usb_resume(struct platform_device *dev)
         }
     }
 #endif
+#endif
     return 0;
 }
 
 static void amlbt_usb_shutdown(struct platform_device *dev)
 {
     shutdown_value = 1;
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
     /*if ((FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type))
         && (get_resume_method() != RESUME_RTC_S) && (get_resume_method() != RESUME_RTC_C))
     {
@@ -4614,6 +4701,7 @@ static void amlbt_usb_shutdown(struct platform_device *dev)
         amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
         BTI("%s RG_AON_A52:%#x", __func__, amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }*/
+#endif
     BTI("%s \n", __func__);
 }
 
@@ -4715,5 +4803,5 @@ module_param(amlbt_if_type, uint, S_IRUGO);
 module_init(amlbt_init);
 module_exit(amlbt_exit);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("2024-05-10-1714");
+MODULE_DESCRIPTION("2024-06-04-1450");
 

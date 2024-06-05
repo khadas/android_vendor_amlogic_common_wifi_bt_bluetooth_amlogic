@@ -73,11 +73,13 @@
 
 #define AML_BT_CHIP_TYPE        5
 #define AML_BT_INTF_TYPE        3
-#define REG_DEV_RESET           0x00f03058
-#define REG_PMU_POWER_CFG       0x00f03040
-#define REG_RAM_PD_SHUTDWONW_SW 0x00f03050
-#define REG_FW_MODE             0x00f000e0
-#define RG_AON_A53              0x00f000d4
+#define REG_DEV_RESET           0xf03058
+#define REG_PMU_POWER_CFG       0xf03040
+#define REG_RAM_PD_SHUTDWONW_SW 0xf03050
+#define REG_FW_MODE             0xf000e0
+#define RG_AON_A53              0xf000d4
+#define RG_AON_A59              0xf000ec
+
 #define BIT_PHY                 1
 #define BIT_MAC                 (1 << 1)
 #define BIT_CPU                 (1 << 2)
@@ -94,6 +96,7 @@ extern unsigned int amlbt_fw_mode;
 extern unsigned int amlbt_pin_mux;
 extern unsigned int amlbt_br_digit_gain;
 extern unsigned int amlbt_edr_digit_gain;
+extern unsigned int amlbt_fwlog_config;
 
 extern unsigned int hw_state;
 unsigned int state = 0;
@@ -276,6 +279,7 @@ enum
     HW_CFG_AML_DOWNLOAD_FIRMWARE_CLOSE_EVENT,   //6
     HW_CFG_AML_CONFIG_RF_CALIBRATION,   //7
     HW_CFG_AML_CONFIG_TX_POWER,   //'8' w2 used
+    HW_CFG_AML_CONFIG_FWLOG_OUTPUT,   // '9' w2 used
     HW_CFG_AML_DOWNLOAD_FIRMWARE_STRAT_CPU_UART_BEFORE, //8
     HW_CFG_AML_DOWNLOAD_FIRMWARE_STRAT_CPU_UART,    //9
     HW_CFG_SET_PARAMS,      //a
@@ -333,6 +337,7 @@ uint8_t hw_cfg_download_firmware_dccm_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_
 uint8_t hw_cfg_download_firmware_close_event(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_rf_calibration(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_tx_power(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
+uint8_t hw_cfg_fwlog_output(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_download_firmware_start_cpu_uart_before(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_download_firmware_start_cpu_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_set_params(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
@@ -357,36 +362,37 @@ uint8_t hw_cfg_rom_check(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 
 uint8_t (*hw_config_func[])(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p) =
 {
-    hw_cfg_write_fw_mode,    //0
-    hw_cfg_update_baudrate_uart,    //1
-    hw_cfg_download_firmware_test_3_uart,   //2
-    hw_cfg_download_firmware_test_2_uart,  //3
-    hw_cfg_download_firmware_iccm_uart, //4
-    hw_cfg_download_firmware_dccm_uart, //5
-    hw_cfg_download_firmware_close_event,   //6
-    hw_cfg_rf_calibration,   //7
-    hw_cfg_tx_power,   //'8' w2 used
-    hw_cfg_download_firmware_start_cpu_uart_before, //8
-    hw_cfg_download_firmware_start_cpu_uart,    //9
-    hw_cfg_set_params,      //a
-    hw_cfg_set_bd_addr,     //b
-    hw_cfg_bt_power_end,   //c
-    wole_config_write_manufacture,    //d
-    hw_cfg_start,       //e
-    hw_cfg_set_uart_clock,  //f
-    hw_cfg_set_uart_baud1, //g
-    hw_cfg_read_local_name, //h
+    hw_cfg_write_fw_mode,    //0x0
+    hw_cfg_update_baudrate_uart,    //0x1
+    hw_cfg_download_firmware_test_3_uart,   //0x2
+    hw_cfg_download_firmware_test_2_uart,  //0x3
+    hw_cfg_download_firmware_iccm_uart, //0x4
+    hw_cfg_download_firmware_dccm_uart, //0x5
+    hw_cfg_download_firmware_close_event,   //0x6
+    hw_cfg_rf_calibration,   //0x7
+    hw_cfg_tx_power,   //0x8 w2 used
+    hw_cfg_fwlog_output,   //0x9 w2 used
+    hw_cfg_download_firmware_start_cpu_uart_before, //0xa
+    hw_cfg_download_firmware_start_cpu_uart,    //0xb
+    hw_cfg_set_params,      //0xc
+    hw_cfg_set_bd_addr,     //0xd
+    hw_cfg_bt_power_end,   //0xe
+    wole_config_write_manufacture,    //0xf
+    hw_cfg_start,       //0x10
+    hw_cfg_set_uart_clock,  //0x11
+    hw_cfg_set_uart_baud1, //0x12
+    hw_cfg_read_local_name, //0x13
     //hw_cfg_dl_minidriver,   //
-    hw_cfc_null_2,     //i
-    hw_cfg_set_uart_baud_2, //j
-    hw_cfg_update_baudrate, //k
-    hw_cfg_get_reg, //l
-    hw_cfg_download_firmware_change_baudrate_uart,  //m
-    hw_cfg_download_firmware_finish_uart,   //n
-    hw_cfg_download_firmware_test_uart, //o
-    hw_cfg_set_baudrate, //p
+    hw_cfc_null_2,     //0x14
+    hw_cfg_set_uart_baud_2, //0x15
+    hw_cfg_update_baudrate, //0x16
+    hw_cfg_get_reg, //0x17
+    hw_cfg_download_firmware_change_baudrate_uart,  //0x18
+    hw_cfg_download_firmware_finish_uart,   //0x19
+    hw_cfg_download_firmware_test_uart, //0x1a
+    hw_cfg_set_baudrate, //0x1b
 #if (USE_CONTROLLER_BDADDR == TRUE)
-    hw_cfg_read_bd_addr,   //q
+    hw_cfg_read_bd_addr,   //0x1c
 #endif
 };
 
@@ -1819,6 +1825,29 @@ uint8_t hw_cfg_tx_power(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
     UINT32_TO_STREAM(p, RG_AON_A53);
     reg_val |= (amlbt_pin_mux << 20);
     reg_val |= (((amlbt_edr_digit_gain & 0xff) << 8) | (amlbt_br_digit_gain & 0xff));
+    //BTHWDBG("reg_val=%#x", reg_val);
+    UINT32_TO_STREAM(p, reg_val);
+
+    p_buf->len = HCI_CMD_PREAMBLE_SIZE + \
+                 8;
+    hw_cfg_cb.state = HW_CFG_AML_CONFIG_FWLOG_OUTPUT;
+    is_proceeding = bt_vendor_cbacks->xmit_cb(TCI_WRITE_REG, \
+                    p_buf, hw_config_cback);
+
+    return is_proceeding;
+}
+
+uint8_t hw_cfg_fwlog_output(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
+{
+    uint8_t is_proceeding = FALSE;
+    uint32_t reg_val = 0;
+
+    BTHWDBG("amlbt_fwlog_config=%d", amlbt_fwlog_config);
+
+    UINT16_TO_STREAM(p, TCI_WRITE_REG);
+    *p++ = 8;
+    UINT32_TO_STREAM(p, RG_AON_A59);
+    reg_val |= (amlbt_fwlog_config & 0x3);
     //BTHWDBG("reg_val=%#x", reg_val);
     UINT32_TO_STREAM(p, reg_val);
 

@@ -808,9 +808,9 @@ static void property_get_state(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2024-0510-1720\n");
-    ALOGI("Iae08fd15ed59fb9a89a923bfa2383c7f7777e511\n");
-    ALOGI("release commit:107bb239f7f47bf3a425469e963f02cc8a99eb00 2024-05-10\n");
+    ALOGI("amlbt init 0x2024-0604-2020\n");
+    ALOGI("I157aa92896725d63431ec8b2a907593fe4b75270\n");
+    ALOGI("release commit:3d6a27323fa878809e49158ae75cc2ef1979a4c2 2024-06-05\n");
 
     if (p_cb == NULL)
     {
@@ -1391,7 +1391,7 @@ void download_hw_crash_ioctl()
         revcrash = ioctl(g_userial_fd, IOCTL_SET_BT_RESET);
         if (revcrash < 0)
         {
-            ALOGD("ioctl send failed!");
+            ALOGD("ioctl send failed: fd %d, error %s, revData %ld", g_userial_fd, strerror(errno), revcrash);
         }
         else
         {
@@ -1550,7 +1550,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
 
                 if (ioctl(g_userial_fd, IOCTL_GET_BT_DOWNLOAD_STATUS, &revData) != 0)
                 {
-                    ALOGD("ioctl send failed!");
+                    ALOGD("ioctl send failed: fd %d, error %s, revData %ld", g_userial_fd, strerror(errno), revData);
                 }
                 else
                 {

@@ -71,6 +71,7 @@ unsigned int amlbt_fw_mode = 0;
 unsigned int amlbt_pin_mux = 0;
 unsigned int amlbt_br_digit_gain = 0;
 unsigned int amlbt_edr_digit_gain = 0;
+unsigned int amlbt_fwlog_config = 0;
 
 /******************************************************************************
 **  Static variables
@@ -242,6 +243,10 @@ void load_aml_stack_conf()
         else if (!strcmp(aml_trim(line_f), "EdrDigitGain")) {
             amlbt_edr_digit_gain = strtol(aml_trim(split+1), &endptr, 0);
             ALOGE("%s amlbt_edr_digit_gain '%#x'", __func__, amlbt_edr_digit_gain);
+        }
+        else if (!strcmp(aml_trim(line_f), "Btfwlog")) {
+            amlbt_fwlog_config = strtol(aml_trim(split+1), &endptr, 0);
+            ALOGE("%s amlbt_edr_digit_gain '%#x'", __func__, amlbt_fwlog_config);
         }
     }
     fclose(fp);
