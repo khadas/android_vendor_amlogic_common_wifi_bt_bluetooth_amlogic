@@ -808,9 +808,9 @@ static void property_get_state(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2024-0604-2020\n");
-    ALOGI("I157aa92896725d63431ec8b2a907593fe4b75270\n");
-    ALOGI("release commit:3d6a27323fa878809e49158ae75cc2ef1979a4c2 2024-06-05\n");
+    ALOGI("amlbt init 0x2024-0605-1130\n");
+    ALOGI("I93f43b8ef8daead2865b40e6f5afbb3f4e8e6a56\n");
+    ALOGI("release commit:b3a370eea9eab24e0c058e658d5c1f3e68c5ba74 2024-06-07\n");
 
     if (p_cb == NULL)
     {

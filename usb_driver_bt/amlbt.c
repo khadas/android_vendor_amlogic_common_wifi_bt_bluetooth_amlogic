@@ -4538,7 +4538,7 @@ static void amlbt_usb_insmod(void)
 {
     // int ret = 0;
     BTI("BTAML version:%#x\n", AML_BT_VERSION);
-    BTI("release commit: 3d6a27323fa878809e49158ae75cc2ef1979a4c2 2024-06-05\n");
+    BTI("release commit: b3a370eea9eab24e0c058e658d5c1f3e68c5ba74 2024-06-07\n");
     BTI("++++++usb bt driver insmod start.++++++\n");
     BTI("------usb bt driver insmod end.------\n");
 
