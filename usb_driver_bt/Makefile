@@ -16,7 +16,7 @@ $(AMLBT_MOD_NAME)-objs := $(AMLBT_CFILES:.c=.o)
 ###############################################################################
 obj-m += $(AMLBT_MOD_NAME).o
 
-EXTRA_CFLAGS += -Wno-pointer-to-int-cast
+EXTRA_CFLAGS += -Wno-pointer-to-int-cast -Wno-format
 
 all:
 	make -C $(KERNEL_SRC) M=$(M) KBUILD_EXTRA_SYMBOLS=$(EXTRA_SYMBOLS_PATH_USB_BT) modules
