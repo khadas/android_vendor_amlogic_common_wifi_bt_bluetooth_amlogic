@@ -43,7 +43,7 @@ static unsigned int dbg_credit = 8;
 static unsigned int dbg_cnt = 0;
 #endif
 
-#define AML_BT_VERSION  (0x20240604)
+#define AML_BT_VERSION  (0x20240608)
 
 #define BT_EP           (USB_EP2)
 
@@ -2644,11 +2644,14 @@ static int amlbt_usb_get_data(bool val)
         BTF("%s5 g_fw_type_fifo->w:%#x g_fw_type_fifo->r:%#x", __func__, g_fw_type_fifo->w, g_fw_type_fifo->r);
         BTF("%s5 g_fw_evt_fifo->w:%#x g_fw_evt_fifo->r:%#x", __func__, g_fw_evt_fifo->w, g_fw_evt_fifo->r);
         BTF("%s5 g_fw_data_fifo->w:%#x g_fw_data_fifo->r:%#x", __func__, g_fw_data_fifo->w, g_fw_data_fifo->r);
-        BTF("%s5 data_size:%#x evt_size:%#x", __func__, data_size, evt_size);
+        BTF("%s5 type_size:%#x data_size:%#x evt_size:%#x", __func__, type_size, data_size, evt_size);
+        BTF("%s5 TYPE:[%#x,%#x,%#x,%#x]\n", __func__, type_buff[0], type_buff[4], type_buff[8], type_buff[12]);
     }
     //complete(&data_completion);
     //printk("[r:%#x w:%#x]", g_rx_type_fifo->r, g_rx_type_fifo->w);
+    mutex_lock(&fw_type_fifo_mutex);
     gdsl_fifo_copy_data(g_fw_type_fifo, type_buff, type_size);
+    mutex_unlock(&fw_type_fifo_mutex);
     bt_wt_ptr_local = (unsigned long)g_rx_type_fifo->w;
     return 0;
 }
@@ -2783,15 +2786,18 @@ static ssize_t amlbt_usb_char_read(struct file *file_p,
             {
                 return -EFAULT;
             }
+            mutex_lock(&fw_type_fifo_mutex);
             if (0 == gdsl_fifo_get_data(g_fw_type_fifo, bt_type, sizeof(bt_type)))
             {
+                mutex_unlock(&fw_type_fifo_mutex);
                 return -EFAULT;
             }
+            mutex_unlock(&fw_type_fifo_mutex);
             //gdsl_fifo_get_data(g_fw_type_fifo, bt_type, sizeof(bt_type));
             BTD("tp(%#x,%#x,%#x,%#x)\n", bt_type[0],bt_type[1],bt_type[2],bt_type[3]);
             if (bt_type[0] != 0x4 && bt_type[0] != 0x2 && bt_type[0] != 0x10)
             {
-                BTE("TYPE ERROR(%#x,%#x,%#x,%#x)\n", bt_type[0],bt_type[1],bt_type[2],bt_type[3]);
+                BTE("TYPE size %#x ERROR (%#x,%#x,%#x,%#x)\n", gdsl_fifo_get_data(g_fw_type_fifo, bt_type, sizeof(bt_type)), bt_type[0],bt_type[1],bt_type[2],bt_type[3]);
                 BTE("g_fw_type_fifo->w:%#x g_fw_type_fifo->r:%#x\n", g_fw_type_fifo->w, g_fw_type_fifo->r);
                 BTE("g_fw_evt_fifo->w:%#x g_fw_evt_fifo->r:%#x\n", g_fw_evt_fifo->w, g_fw_evt_fifo->r);
                 BTE("g_fw_data_fifo->w:%#x g_fw_data_fifo->r:%#x\n", g_fw_data_fifo->w, g_fw_data_fifo->r);
@@ -4538,7 +4544,7 @@ static void amlbt_usb_insmod(void)
 {
     // int ret = 0;
     BTI("BTAML version:%#x\n", AML_BT_VERSION);
-    BTI("release commit: b3a370eea9eab24e0c058e658d5c1f3e68c5ba74 2024-06-07\n");
+    BTI("release commit: 2ce02e7be73862f3ea1dcf80e97fa5a7cf4a9561 2024-06-10\n");
     BTI("++++++usb bt driver insmod start.++++++\n");
     BTI("------usb bt driver insmod end.------\n");
 
@@ -4803,5 +4809,5 @@ module_param(amlbt_if_type, uint, S_IRUGO);
 module_init(amlbt_init);
 module_exit(amlbt_exit);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("2024-06-04-1450");
+MODULE_DESCRIPTION("2024-06-08-1715");
 
