@@ -69,6 +69,8 @@ typedef struct
 /******************************************************************************
 **  Static variables
 ******************************************************************************/
+extern int bt_sdio_fd;
+extern int g_userial_fd;
 
 static vnd_userial_cb_t vnd_userial;
 
@@ -302,25 +304,39 @@ open_retry:
 void userial_vendor_close(void)
 {
     int result;
-
-    ALOGD("SJD userial_vendor_close %d", vnd_userial.fd);
-
-    if (vnd_userial.fd == -1)
-        return;
-
+    if (amlbt_transtype.interface != AML_INTF_USB)
+    {
+        if (bt_sdio_fd != -1)
+        {
+            close(bt_sdio_fd);
+            bt_sdio_fd = -1;
+        }
+        ALOGD("SJD userial_vendor_close %d", vnd_userial.fd);
 #if (BT_WAKE_VIA_USERIAL_IOCTL == TRUE)
-    /* de-assert bt_wake BEFORE closing port */
-    ioctl(vnd_userial.fd, USERIAL_IOCTL_BT_WAKE_DEASSERT, NULL);
+        /* de-assert bt_wake BEFORE closing port */
+        ioctl(vnd_userial.fd, USERIAL_IOCTL_BT_WAKE_DEASSERT, NULL);
 #endif
 
-    ALOGD("device fd = %d close", vnd_userial.fd);
-    // flush Tx before close to make sure no chars in buffer
-    tcflush(vnd_userial.fd, TCIOFLUSH);
-    if ((result = close(vnd_userial.fd)) < 0)
-        ALOGE("close(fd:%d) FAILED result:%d", vnd_userial.fd, result);
+        if (vnd_userial.fd == -1)
+            return;
+        ALOGD("device fd = %d close", vnd_userial.fd);
+        // flush Tx before close to make sure no chars in buffer
+        tcflush(vnd_userial.fd, TCIOFLUSH);
+        if ((result = close(vnd_userial.fd)) < 0)
+            ALOGE("close(fd:%d) FAILED result:%d error %s", vnd_userial.fd, result, strerror(errno));
 
-    vnd_userial.fd = -1;
-    ALOGD("SJD userial_vendor_closed");
+        g_userial_fd = -1;
+        vnd_userial.fd = -1;
+        ALOGD("SJD userial_vendor_closed");
+    }
+    else
+    {
+        if (g_userial_fd != -1)
+        {
+            close(g_userial_fd);
+            g_userial_fd = -1;
+        }
+    }
 }
 
 /*******************************************************************************
@@ -394,17 +410,24 @@ int userial_set_port(char *p_conf_name __unused, char *p_conf_value, int param _
     return 0;
 }
 
-int userial_vendor_uart_open(void)
+int userial_vendor_devchar_open(void)
 {
     uint8_t cnt = 0;
-
-    snprintf(vnd_userial.port_name, VND_PORT_NAME_MAXLEN, "%s", \
-             "/dev/stpbt");
+    int fd = -1;
+    uint8_t port[VND_PORT_NAME_MAXLEN];
+    if (amlbt_transtype.interface == AML_INTF_USB)
+    {
+        snprintf(port, VND_PORT_NAME_MAXLEN, "%s", "/dev/aml_btusb");
+    }
+    else
+    {
+        snprintf(port, VND_PORT_NAME_MAXLEN, "%s", "/dev/stpbt");
+    }
 
 open_retry:
-    if ((vnd_userial.fd = open(vnd_userial.port_name, O_RDWR)) < 0)
+    if ((fd = open(port, O_RDWR)) < 0)
     {
-        ALOGE("%s: unable to open %s: %s %d", __func__, vnd_userial.port_name, strerror(errno), cnt);
+        ALOGE("%s: unable to open %s: %s %d", __func__, port, strerror(errno), cnt);
         usleep(50000);
         cnt++;
         if (cnt < 40)
@@ -413,37 +436,10 @@ open_retry:
         return -1;
     }
 
-    ALOGE("%s, device name = %s", __func__, vnd_userial.port_name);
+    ALOGD("%s, device name = %s", __func__, port);
     //vnd_userial.btdriver_state = true;
-    ALOGE("device fd = %d open", vnd_userial.fd);
+    ALOGD("device fd = %d open", fd);
 
-    return vnd_userial.fd;
+    return fd;
 }
-
-int userial_vendor_usb_open(void)
-{
-    uint8_t cnt = 0;
-
-    snprintf(vnd_userial.port_name, VND_PORT_NAME_MAXLEN, "%s", \
-             "/dev/aml_btusb");
-
-open_retry:
-    if ((vnd_userial.fd = open(vnd_userial.port_name, O_RDWR)) < 0)
-    {
-        ALOGE("%s: unable to open %s: %s %d", __func__, vnd_userial.port_name, strerror(errno), cnt);
-        usleep(50000);
-        cnt++;
-        if (cnt < 40)
-            goto open_retry;
-        ALOGE("userial vendor open fail!!");
-        return -1;
-    }
-
-    ALOGE("%s, device name = %s", __func__, vnd_userial.port_name);
-    //vnd_userial.btdriver_state = true;
-    ALOGE("device fd = %d open", vnd_userial.fd);
-
-    return vnd_userial.fd;
-}
-
 

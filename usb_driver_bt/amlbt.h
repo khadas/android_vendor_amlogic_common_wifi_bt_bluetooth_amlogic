@@ -18,8 +18,8 @@ typedef unsigned long SYS_TYPE;
 #define WF_SRAM_TX_Q_NUM	(8)
 
 #define HOST_TX_FIFO_LEN	(128)
-#define TX_Q_LEN			(1024)
-#define RX_Q_LEN			(1024)
+#define TX_Q_LEN			(1032)
+#define RX_Q_LEN			(1032)
 #define RX_TYPE_FIFO_LEN	(1024)
 
 #define WF_SRAM_TX_Q_ADDR		(WF_SRAM_RFU_ADDR + 0x0)			//8k	0x938000
@@ -72,8 +72,8 @@ typedef unsigned long SYS_TYPE;
 #define HI_USB_EVENT_Q_ADDR     0x00514000  //length:1340 bytes
 #define HI_USB_CMD_Q_ADDR       0x00518000  //length:4096 bytes
 
-#define USB_TX_Q_LEN            (1028)
-#define USB_RX_Q_LEN            (1024)
+#define USB_TX_Q_LEN            (1032)
+#define USB_RX_Q_LEN            (1032)
 #define USB_EVENT_Q_LEN         (1024)
 #define USB_RX_INDEX_FIFO_LEN   (20)
 #define USB_RX_TYPE_FIFO_LEN    (256)
@@ -164,6 +164,12 @@ typedef struct
     unsigned int tx_q_dev_index;
 } gdsl_tx_q_t;
 
+struct aml_pm_type {
+    atomic_t bus_suspend_cnt;
+    atomic_t drv_suspend_cnt;
+    atomic_t is_suht_down;
+    atomic_t wifi_enable;
+};
 
 struct aml_hwif_sdio {
     struct sdio_func * sdio_func_if[SDIO_FUNCNUM_MAX];

@@ -43,7 +43,7 @@ static unsigned int dbg_credit = 8;
 static unsigned int dbg_cnt = 0;
 #endif
 
-#define AML_BT_VERSION  (0x20240608)
+#define AML_BT_VERSION  (0x20240706)
 
 #define BT_EP           (USB_EP2)
 
@@ -156,6 +156,7 @@ extern struct auc_hif_ops g_auc_hif_ops;
 extern struct aml_hif_sdio_ops g_hif_sdio_ops;
 extern struct aml_bus_state_detect bus_state_detect;
 //extern int auc_send_cmd(unsigned int addr, unsigned int len);
+extern struct aml_pm_type g_wifi_pm;
 
 extern struct usb_device *g_udev;
 extern int auc_send_cmd_ep1(unsigned int addr, unsigned int len);
@@ -199,6 +200,8 @@ static unsigned int fw_cmd_r = 0;
 #define IOCTL_GET_BT_TIME_PERCENT       _IOR(BTUSB_IOC_MAGIC, 19, int)
 #define IOCTL_GET_WF_TIME_PERCENT       _IOR(BTUSB_IOC_MAGIC, 20, int)
 #define IOCTL_EXIT_USER                 _IOW(BTUSB_IOC_MAGIC, 21, int)
+#define IOCTL_SET_BT_FW_ENABLE          _IOR(BTUSB_IOC_MAGIC, 22, int)
+#define IOCTL_SET_BT_FW_DISABLE         _IOR(BTUSB_IOC_MAGIC, 23, int)
 
 #define ICCM_RAM_BASE           (0x000000)
 #define DCCM_RAM_BASE           (0xd00000)
@@ -236,6 +239,7 @@ static unsigned int suspend_value = 0;
 static unsigned int shutdown_value = 0;
 static unsigned int bt_recovery = 0;
 static unsigned int fwdead_value = 0;
+static unsigned int fw_enable = 1;
 
 static struct completion download_completion;
 static unsigned char sdio_cmd_buff[128] = {0};
@@ -460,6 +464,46 @@ static void amlbt_usb_ram_init(void)
 
         usb_driver_fw_status_ptr = 0x005101fc;
     }
+}
+/*
+static void amlbt_sdio_write_word(unsigned int addr, unsigned int data)
+{
+    if (g_hif_sdio_ops.hi_random_word_write == NULL)
+    {
+        BTE("amlbt_sdio_write_word NULL");
+        return ;
+    }
+    g_hif_sdio_ops.hi_random_word_write(addr, data);
+}
+
+static void amlbt_sdio_read_word(unsigned int addr)
+{
+    if (g_hif_sdio_ops.hi_random_word_read == NULL)
+    {
+        BTE("amlbt_sdio_read_word NULL");
+        return ;
+    }
+    g_hif_sdio_ops.hi_random_word_read(addr);
+}
+
+static void amlbt_sdio_read_sram(unsigned char* buf, unsigned char* addr, unsigned int len)
+{
+    if (g_hif_sdio_ops.hi_random_ram_read == NULL)
+    {
+        BTE("amlbt_sdio_read_sram NULL");
+        return ;
+    }
+    g_hif_sdio_ops.hi_random_ram_read(buf, addr, len);
+}
+*/
+static void amlbt_sdio_write_sram(unsigned char* buf, unsigned char* addr, unsigned int len)
+{
+    if (g_hif_sdio_ops.hi_random_ram_write == NULL)
+    {
+        BTE("amlbt_sdio_write_sram NULL");
+        return ;
+    }
+    g_hif_sdio_ops.hi_random_ram_write(buf, addr, len);
 }
 
 static void amlbt_usb_write_word(unsigned int addr,unsigned int data, unsigned int ep)
@@ -1398,6 +1442,59 @@ static void amlbt_usb_send_hci_cmd(unsigned char *data, unsigned int len)
     }
     BTP("len %#x:w %#lx, r %#lx\n", len, (unsigned long)g_cmd_fifo->w, (unsigned long)g_cmd_fifo->r);
 }
+
+static void amlbt_usb_reset_fw_before_close(void)
+{
+    unsigned char reset_cmd[] = {0x03, 0x0C, 0x00};
+    unsigned char event[] = {0x04, 0x0E, 0x04, 0x01, 0x03, 0x0C, 0x00 };
+    unsigned char host_read_buff[USB_TX_Q_LEN+64] = {0};
+    unsigned char bt_type[4] = {0};
+    unsigned int  read_len = 0;
+    unsigned int  total_len = 0;
+    int i = 0;
+    int k = 0;
+    BTI("send reset before close");
+    amlbt_usb_send_hci_cmd(reset_cmd, sizeof(reset_cmd));
+    do
+    {
+        BTI("try get reset rsp");
+        i =  0;
+        k++;
+        usleep_range(10000, 10000);
+        do
+        {
+            mutex_lock(&fw_type_fifo_mutex);
+            read_len = gdsl_fifo_get_data(g_fw_type_fifo, bt_type, sizeof(bt_type));
+            mutex_unlock(&fw_type_fifo_mutex);
+            BTI("read_len %d bt_type %d", read_len, bt_type[0]);
+            if (read_len && bt_type[0] == HCI_EVENT_PKT)
+            {
+                gdsl_fifo_get_data(g_fw_evt_fifo, host_read_buff, 4);
+                total_len = host_read_buff[2];
+                total_len -= 1;
+                total_len = ((total_len + 3) & 0xFFFFFFFC);
+                gdsl_fifo_get_data(g_fw_evt_fifo, &host_read_buff[4], total_len);
+                for (i = 0; i < sizeof(event); i++)
+                {
+                    if (event[i] != host_read_buff[i])
+                        break;
+                }
+                if (i == sizeof(event))
+                {
+                    BTI("get reset rsp");
+                    break;
+                }
+            } else if (read_len && bt_type[0] == HCI_ACLDATA_PKT)
+            {
+                gdsl_fifo_get_data(g_fw_data_fifo, host_read_buff, 8);
+                read_len = ((host_read_buff[7] << 8) | (host_read_buff[6]));
+                read_len = ((read_len + 3) & 0xFFFFFFFC);
+                gdsl_fifo_calc_r(g_fw_data_fifo, &host_read_buff[8], read_len);
+            }
+        }while(read_len);
+    } while(i != sizeof(event) && k < 100);
+}
+
 unsigned int gdsl_fifo_update_r(gdsl_fifo_t *p_fifo, unsigned int len)
 {
     unsigned int offset = 0;
@@ -1893,10 +1990,8 @@ void amlbt_usb_fifo_deinit(void)
 static void amlbt_usb_init(void)
 {
     BTD("%s\n", __func__);
-    if (!download_fw)
-    {
-        amlbt_usb_fifo_init();
-    }
+
+    amlbt_usb_fifo_init();
     check_fw_rx_stask = kthread_run(amlbt_usb_check_fw_rx, NULL, "check_fw_rx_thread");
     mutex_init(&fw_type_fifo_mutex);
     mutex_init(&fw_evt_fifo_mutex);
@@ -2164,14 +2259,13 @@ static int amlbt_usb_char_close(struct inode *inode_p, struct file *file_p)
         BTI("event w:%#lx,r:%#lx\n", g_event_fifo->w, g_event_fifo->r);
     }
 
-    if (download_fw)
+    if (close_state == 0)
     {
-        amlbt_usb_deinit();
-        if (bt_recovery || fwdead_value)
-        {
-            amlbt_usb_fifo_deinit();
-        }
+        amlbt_usb_reset_fw_before_close();
     }
+
+    amlbt_usb_deinit();
+    amlbt_usb_fifo_deinit();
 
     if (bt_recovery || fwdead_value)
     {
@@ -2184,7 +2278,6 @@ static int amlbt_usb_char_close(struct inode *inode_p, struct file *file_p)
         bt_recovery = 0;
         fwdead_value = 0;
     }
-    close_state = 0;
     return 0;
 }
 
@@ -2281,7 +2374,7 @@ static int amlbt_usb_get_data_w1u(void)
     unsigned long tmp = 0;
     unsigned int data_index = 0;
     //unsigned char data_index[USB_RX_INDEX_FIFO_LEN] = {0};
-    static unsigned char fw_read_buff[WF_SRAM_EVENT_LEN] = {0};
+    static unsigned char fw_read_buff[4*RX_Q_LEN] = {0};
     static unsigned char type_buff[RX_TYPE_FIFO_LEN] = {0};
 
 
@@ -2431,7 +2524,7 @@ static int amlbt_usb_get_data(bool val)
     unsigned int evt_size = 0;
     unsigned int data_size = 0;
     unsigned long w_point = 0;
-    static unsigned char fw_read_buff[USB_EVENT_Q_LEN*4] = {0};
+    static unsigned char fw_read_buff[USB_RX_Q_LEN*4] = {0};
     static unsigned char type_buff[USB_RX_TYPE_FIFO_LEN] = {0};
     unsigned int i = 0;
     unsigned int reg = 0;
@@ -2681,7 +2774,7 @@ int amlbt_usb_check_fw_rx(void *data)
             check_fw_rx_stask = NULL;
             break;
         }
-        while (suspend_value || shutdown_value)
+        while (suspend_value || shutdown_value || !fw_enable)
         {
             usleep_range(20000, 20000);
             if (close_state)
@@ -3003,11 +3096,19 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
         {
             memcpy(&BT_fwICCM[iccm_base_addr], &p_acl_buf[7], len);
             iccm_base_addr += len;
+            if (iccm_base_addr > bt_iccm_size)
+            {
+                BTF("iccm_base_addr error: %#x", iccm_base_addr);
+            }
         }
         else
         {
             memcpy(&BT_fwDCCM[dccm_base_addr], &p_acl_buf[7], len);
             dccm_base_addr += len;
+            if (dccm_base_addr > bt_dccm_size)
+            {
+                BTF("dccm_base_addr error: %#x", dccm_base_addr);
+            }
         }
     }
     else if (p_acl_buf[0] == 0xf1 && p_acl_buf[1] == 0xfe)
@@ -3132,6 +3233,10 @@ static ssize_t amlbt_usb_char_write(struct file *file_p,
         BTP("hci cmd:[%#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x]",
             p_acl_buf[0],p_acl_buf[1],p_acl_buf[2],p_acl_buf[3],
             p_acl_buf[4],p_acl_buf[5],p_acl_buf[6],p_acl_buf[7]);
+    }
+    while (suspend_value || !fw_enable)
+    {
+        usleep_range(20000, 20000);
     }
 
     BTD("s: %#x\n", w_type);
@@ -3565,6 +3670,44 @@ static long btusbchr_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             g_lib_cmd_fifo = gdsl_fifo_init(CMD_FIFO_SIZE, g_lib_cmd_buff);
         }
         break;
+        case IOCTL_SET_BT_FW_ENABLE:
+        {
+            BTI("IOCTL_SET_BT_FW_ENABLE");
+            reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
+            BTI("%s RG_AON_A52 %#x", __func__, reg_value);
+            reg_value |= (1 << 24);
+            amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
+            BTI("RG_AON_A52 %#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+            if ((amlbt_usb_read_word(RG_BT_PMU_A15, BT_EP) & 0xF) == PMU_SLEEP_MODE)
+            {
+                reg_value = amlbt_usb_read_word(RG_BT_PMU_A16, BT_EP);
+                BTI("%s RG_BT_PMU_A16 %#x", __func__, reg_value);
+                //reg_value |= (1 << 17);
+                reg_value |= (1 << 1);
+                amlbt_usb_write_word(RG_BT_PMU_A16, reg_value, BT_EP);
+                BTI("RG_BT_PMU_A16 %#x", amlbt_usb_read_word(RG_BT_PMU_A16, BT_EP));
+            }
+            while (reg_value != 0)
+            {
+                reg_value = amlbt_usb_read_word(RG_AON_A55, BT_EP);
+                reg_value = (reg_value >> 29) & 0x1;
+                BTI("%s RG_AON_A55 %#x", __func__, reg_value);
+                msleep(5);
+            }
+            fw_enable = 1;
+        }
+        break;
+        case IOCTL_SET_BT_FW_DISABLE:
+        {
+            BTI("IOCTL_SET_BT_FW_DISABLE");
+            reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
+            BTI("%s RG_AON_A52 %#x", __func__, reg_value);
+            reg_value &= ~(1 << 24);
+            amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
+            BTI("RG_AON_A52 %#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+            fw_enable = 0;
+        }
+        break;
         case IOCTL_SET_BT_COEX_TIME:
         {
             if (!download_fw)
@@ -3939,8 +4082,8 @@ void amlbt_sdio_download_firmware(void)
         if (remain_len < write_size)
         {
             BTD("bt_usb_download_firmware iccm1 offset %#x, addr %#x\n", offset, iccm_base_addr);
-            g_hif_sdio_ops.hi_random_ram_write((unsigned char *)&fw_iccmBuf[offset], (unsigned char *)(unsigned long)iccm_base_addr, remain_len);
-            //g_hif_sdio_ops.hi_random_ram_read(check_buf, (unsigned char *)(unsigned long)iccm_base_addr, remain_len);
+            amlbt_sdio_write_sram((unsigned char *)&fw_iccmBuf[offset], (unsigned char *)(unsigned long)iccm_base_addr, remain_len);
+            //amlbt_sdio_read_sram(check_buf, (unsigned char *)(unsigned long)iccm_base_addr, remain_len);
             //if (memcmp(check_buf, &fw_iccmBuf[offset], remain_len))
             //{
                 //BTI("Firmware iccm check2 error! offset %#x\n", offset);
@@ -3952,8 +4095,8 @@ void amlbt_sdio_download_firmware(void)
         else
         {
             BTD("amlbt_sdio_download_firmware iccm2 offset %#x, write_len %#x, addr %#x\n", offset, write_size, iccm_base_addr);
-            g_hif_sdio_ops.hi_random_ram_write((unsigned char *)&fw_iccmBuf[offset], (unsigned char *)(unsigned long)iccm_base_addr, write_size);
-            //g_hif_sdio_ops.hi_random_ram_read(check_buf, (unsigned char *)(unsigned long)iccm_base_addr, write_size);
+            amlbt_sdio_write_sram((unsigned char *)&fw_iccmBuf[offset], (unsigned char *)(unsigned long)iccm_base_addr, write_size);
+            //amlbt_sdio_read_sram(check_buf, (unsigned char *)(unsigned long)iccm_base_addr, write_size);
             //if (memcmp(check_buf, &fw_iccmBuf[offset], write_size))
             //{
             //    BTI("Firmware iccm check error! offset %#x\n", offset);
@@ -3976,8 +4119,8 @@ void amlbt_sdio_download_firmware(void)
         if (remain_len < write_size)
         {
             BTD("bt_usb_download_firmware dccm1 offset %#x, addr %#x\n", offset, dccm_base_addr);
-            g_hif_sdio_ops.hi_random_ram_write((unsigned char *)&fw_dccmBuf[offset], (unsigned char *)(unsigned long)dccm_base_addr, remain_len);
-            //g_hif_sdio_ops.hi_random_ram_read(check_buf, (unsigned char *)(unsigned long)dccm_base_addr, remain_len);
+            amlbt_sdio_write_sram((unsigned char *)&fw_dccmBuf[offset], (unsigned char *)(unsigned long)dccm_base_addr, remain_len);
+            //amlbt_sdio_read_sram(check_buf, (unsigned char *)(unsigned long)dccm_base_addr, remain_len);
             //if (memcmp(check_buf, &fw_dccmBuf[offset], remain_len))
             //{
             //    BTI("Firmware dccm check2 error! offset %#x\n", offset);
@@ -3989,8 +4132,8 @@ void amlbt_sdio_download_firmware(void)
         else
         {
             BTD("amlbt_sdio_download_firmware dccm2 offset %#x, write_len %#x, addr%#x\n", offset, write_size, dccm_base_addr);
-            g_hif_sdio_ops.hi_random_ram_write((unsigned char *)&fw_dccmBuf[offset], (unsigned char *)(unsigned long)dccm_base_addr, write_size);
-            //g_hif_sdio_ops.hi_random_ram_read(check_buf, (unsigned char *)(unsigned long)dccm_base_addr, write_size);
+            amlbt_sdio_write_sram((unsigned char *)&fw_dccmBuf[offset], (unsigned char *)(unsigned long)dccm_base_addr, write_size);
+            //amlbt_sdio_read_sram(check_buf, (unsigned char *)(unsigned long)dccm_base_addr, write_size);
             //if (memcmp(check_buf, &fw_dccmBuf[offset], write_size))
             //{
             //    BTI("Firmware dccm check error! offset %#x\n", offset);
@@ -4181,6 +4324,10 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
                // buf[13],buf[14],buf[15]);
             iccm_base_addr += len;
             //BTI("%#x \n", offset);
+            if (iccm_base_addr > bt_iccm_size)
+            {
+                BTF("iccm_base_addr error: %#x", iccm_base_addr);
+            }
         }
         else
         {
@@ -4197,6 +4344,10 @@ static ssize_t amlbt_sdio_char_write(struct file *file_p,
               //  buf[1],buf[2],buf[3],buf[4],buf[5],buf[6],buf[7],buf[8],buf[9],buf[10],buf[11],buf[12],
                // buf[13],buf[14],buf[15]);
             dccm_base_addr += len;
+            if (dccm_base_addr > bt_dccm_size)
+            {
+                BTF("dccm_base_addr error: %#x", dccm_base_addr);
+            }
 
             if (dccm_base_addr >= 0x20000)
             {
@@ -4544,7 +4695,7 @@ static void amlbt_usb_insmod(void)
 {
     // int ret = 0;
     BTI("BTAML version:%#x\n", AML_BT_VERSION);
-    BTI("release commit: 2ce02e7be73862f3ea1dcf80e97fa5a7cf4a9561 2024-06-10\n");
+    BTI("release base commit: 1d1e89a79672a47aee49afdd3e2b8e07e27ee489 2024-07-26\n");
     BTI("++++++usb bt driver insmod start.++++++\n");
     BTI("------usb bt driver insmod end.------\n");
 
@@ -4647,6 +4798,12 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
         reg_value |= (1 << 26);
         amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
         BTI("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+
+        reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
+        BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
+        reg_value &= ~(1 << 25);
+        amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
+        BTI("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }
     if (FAMILY_TYPE_IS_W1U(amlbt_if_type))
     {
@@ -4663,6 +4820,7 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
 static int amlbt_usb_resume(struct platform_device *dev)
 {
     unsigned int reg_value = 0;
+    int cnt = 0;
     BTI("%s\n", __func__);
     //msleep(1500);
 
@@ -4676,21 +4834,38 @@ static int amlbt_usb_resume(struct platform_device *dev)
         BTI("RG_AON_A15:%#x", amlbt_usb_read_word(RG_AON_A15, BT_EP));
         suspend_value = 0;
     }
-#if 0
-#ifdef CONFIG_AMLOGIC_GX_SUSPEND
-    if ((get_resume_method() != RESUME_RTC_S) && (get_resume_method() != RESUME_RTC_C))
+    if (FAMILY_TYPE_IS_W2(amlbt_if_type))
     {
-        if (FAMILY_TYPE_IS_W2(amlbt_if_type))
+        BTI("g_wifi_pm.bus_suspend_cnt:%#x\n", g_wifi_pm.bus_suspend_cnt);
+        while (atomic_read(&g_wifi_pm.bus_suspend_cnt) != 0) //wait usb reset
         {
-            unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
+            usleep_range(20000, 20000);
+            BTI("g_wifi_pm.bus_suspend_cnt:%#x\n", g_wifi_pm.bus_suspend_cnt);
+        }
+        if (!close_state) //fw don't sleep
+        {
+            reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
             BTI("%s RG_AON_A52:%#x\n", __func__, reg_value);
-            reg_value &= ~(1 << 26);
+            reg_value |= (1 << 25);
             amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
             BTI("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
+
+            while (reg_value != 0) // wait fw enable
+            {
+                reg_value = amlbt_usb_read_word(RG_AON_A55, BT_EP);
+                reg_value = (reg_value >> 29) & 0x1;
+                BTI("%s RG_AON_A55:%#x\n", __func__, reg_value);
+                msleep(5);
+                cnt++;
+                if (cnt >= 200)
+                    break;
+            }
         }
+        if (cnt != 0)
+            cnt = 0;
+        suspend_value = 0;
     }
-#endif
-#endif
+    BTI("%s suspend_value:%#x\n", __func__, suspend_value);
     return 0;
 }
 
@@ -4809,5 +4984,5 @@ module_param(amlbt_if_type, uint, S_IRUGO);
 module_init(amlbt_init);
 module_exit(amlbt_exit);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("2024-06-08-1715");
+MODULE_DESCRIPTION("2024-07-06-1100");
 

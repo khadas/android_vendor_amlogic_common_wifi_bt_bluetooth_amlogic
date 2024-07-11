@@ -80,8 +80,10 @@
 
 #define IOCTL_GET_BT_DOWNLOAD_STATUS    _IOR(BTUSB_IOC_MAGIC, 0, int)
 #define IOCTL_SET_BT_RESET              _IOR(BTUSB_IOC_MAGIC, 1, int)
+#define IOCTL_SET_BT_FW_ENABLE          _IOR(BTUSB_IOC_MAGIC, 22, int)
+#define IOCTL_SET_BT_FW_DISABLE         _IOR(BTUSB_IOC_MAGIC, 23, int)
 
-#define TIMEOUT_TRYSUM    6
+#define TIMEOUT_TRYSUM    20
 #define W1_PID      0x8888
 
 #define finit_module(fd, opts, flags) syscall(SYS_finit_module, fd, opts, flags)
@@ -113,6 +115,7 @@ enum
     HW_DISBT_CONFIGURE,
     HW_REG_PUM_CLEAR,
     HW_CLEAR_LIST,
+    HW_SHUTDOWN_LESCAN,
 };
 
 enum
@@ -138,7 +141,7 @@ enum
 
 bt_vendor_callbacks_t *bt_vendor_cbacks = NULL;
 uint8_t vnd_local_bd_addr[6] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-static int g_userial_fd = -1;
+int g_userial_fd = -1;
 int bt_sdio_fd = -1;
 aml_chip_type amlbt_transtype = {0};
 extern unsigned int amlbt_poweron;
@@ -808,9 +811,9 @@ static void property_get_state(void)
 *****************************************************************************/
 static int init(const bt_vendor_callbacks_t *p_cb, unsigned char *local_bdaddr)
 {
-    ALOGI("amlbt init 0x2024-0605-1130\n");
-    ALOGI("I93f43b8ef8daead2865b40e6f5afbb3f4e8e6a56\n");
-    ALOGI("release commit:b3a370eea9eab24e0c058e658d5c1f3e68c5ba74 2024-06-07\n");
+    ALOGI("amlbt init 0x2024-0709-1950\n");
+    ALOGI("Iec01ba7413a73da720df8e63c9097a33d4258741\n");
+    ALOGI("release base commit:1d1e89a79672a47aee49afdd3e2b8e07e27ee489 2024-07-26\n");
 
     if (p_cb == NULL)
     {
@@ -1399,6 +1402,27 @@ void download_hw_crash_ioctl()
         }
     }
 }
+int aml_shutdown_configure(int fd)
+{
+    unsigned char rsp[HCI_MAX_EVENT_SIZE];
+    unsigned char read_a52_cmd[] = {0x01, 0xf0, 0xfc, 0x04, 0xd0, 0x00, 0xf0, 0x00};
+    //set the bit 27  of RG_AON_A52(0x00f000d0) to 1 when shutdown;reboot
+    unsigned char reset_A52_cmd[] = {0x01, 0xf1, 0xfc, 0x08, 0xd0, 0x00, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    aml_hci_send_cmd(fd, (unsigned char *)read_a52_cmd, sizeof(read_a52_cmd), (unsigned char *)rsp);
+    ALOGD("aml_disbt_configure read rsp [%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x]",
+        rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6], rsp[7], rsp[8], rsp[9], rsp[10], rsp[11]);
+
+    rsp[10] |= 0x08;
+    reset_A52_cmd[11] = rsp[10];
+    reset_A52_cmd[10] = rsp[9];
+    reset_A52_cmd[9] = rsp[8];
+    reset_A52_cmd[8] = rsp[7];
+
+    aml_hci_send_cmd(fd, (unsigned char *)reset_A52_cmd, sizeof(reset_A52_cmd), (unsigned char *)rsp);
+    ALOGD("aml_shutdown_configure end");
+    return 0;
+}
 
 void amlbt_recovery_init(void)
 {
@@ -1557,6 +1581,17 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                    ALOGD("receive fw flag=%ld\n", revData);
                 }
                 download_hw = revData;
+                if (amlbt_transtype.family_id == AML_W2)
+                {
+                    if (ioctl(g_userial_fd, IOCTL_SET_BT_FW_ENABLE) != 0)
+                    {
+                        ALOGD("ioctl send failed: fd %d, error %s", g_userial_fd, strerror(errno));
+                    }
+                    else
+                    {
+                        ALOGD("IOCTL_SET_BT_FW_ENABLE SUCCESS");
+                    }
+                }
             }
 
             hw_config_start();
@@ -1580,7 +1615,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
 
             if (amlbt_transtype.interface == AML_INTF_USB)
             {
-                fd = userial_vendor_usb_open();
+                fd = userial_vendor_devchar_open();
             }
             else
             {
@@ -1635,6 +1670,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     usleep(100000);
 
                     aml_disbt_configure(g_userial_fd);
+
+                    if (amlbt_transtype.family_id == AML_W2 && strstr(shutdwon_status, "0userrequested") != NULL)
+                    {
+                        aml_shutdown_configure(g_userial_fd);
+                    }
                 }
                 if ((amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO) \
                         && hw_cfg_cb.state == 0)
@@ -1644,12 +1684,19 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     usleep(100000);
                 }
             }
+            if (amlbt_transtype.family_id == AML_W2 && amlbt_transtype.interface == AML_INTF_USB)
+            {
+                if (ioctl(g_userial_fd, IOCTL_SET_BT_FW_DISABLE) != 0)
+                {
+                    ALOGD("ioctl send failed: fd %d, error %s", g_userial_fd, strerror(errno));
+                }
+                else
+                {
+                    ALOGD("IOCTL_SET_BT_FW_DISABLE SUCCESS");
+                }
+            }
             download_hw_crash_ioctl();
             userial_vendor_close();
-            if (bt_sdio_fd != -1)
-            {
-                close(bt_sdio_fd);
-            }
         }
         break;
 
@@ -1670,6 +1717,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             {
                 if (*mode == BT_VND_LPM_DISABLE)
                 {
+                    usleep(100000);
                     hw_reset_close();
                     do
                     {
@@ -1677,6 +1725,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                         if (retry_cnt > TIMEOUT_TRYSUM)
                         {
                             state = HW_DISBT_CONFIGURE;
+                            ALOGE("hw_reset_close timeout");
                             break;
                         }
                         retry_cnt++;
@@ -1693,10 +1742,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             {
                                 state = HW_REG_PUM_CLEAR;
                             }
-                            /*else
+                            else
                             {
-                                state = HW_CLEAR_LIST;
-                            }*/
+                                state = HW_SHUTDOWN_LESCAN;
+                            }
+                            ALOGE("hw_disbt_configure timeout");
                             break;
                         }
                         retry_cnt++;
@@ -1712,25 +1762,27 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             if (retry_cnt > 3*TIMEOUT_TRYSUM)
                             {
                                 state = HW_RESET_CLOSE;
+                                ALOGE("hw_reg_pum_power_cfg_clear timeout");
                                 break;
                             }
                             retry_cnt++;
                         }while (state == HW_REG_PUM_CLEAR);
                     }
-                   /* else
+                    else
                     {
-                        hw_poweroff_clear_list();
+                        hw_shutdown_lescan();
                         do
                         {
                             usleep(5000);
-                            if (retry_cnt > 3*TIMEOUT_TRYSUM)
+                            if (retry_cnt > 4*TIMEOUT_TRYSUM)
                             {
                                 state = HW_RESET_CLOSE;
+                                ALOGE("hw_shutdown_lescan timeout");
                                 break;
                             }
                             retry_cnt++;
-                        }while (state == HW_CLEAR_LIST);
-                    }*/
+                        }while (state == HW_SHUTDOWN_LESCAN);
+                    }
                 }
             }
             if (amlbt_transtype.family_id == AML_W1U && amlbt_transtype.interface == AML_INTF_USB)

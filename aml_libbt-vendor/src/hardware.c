@@ -265,6 +265,7 @@ enum
     HW_DISBT_CONFIGURE,
     HW_REG_PUM_CLEAR,
     HW_CLEAR_LIST,
+    HW_SHUTDOWN_LESCAN,
 };
 
 /* Hardware Configuration State */
@@ -284,23 +285,24 @@ enum
     HW_CFG_AML_DOWNLOAD_FIRMWARE_STRAT_CPU_UART,    //0xb
     HW_CFG_SET_PARAMS,      //0xc
     HW_CFG_SET_BD_ADDR,     //0xd
-    HW_CFG_AML_POWER_END,   //0xe
-    HW_CFG_SET_MANU_DATA,   //0xf
-    HW_CFG_START,       //0x10
-    HW_CFG_SET_UART_CLOCK,  //0x11
-    HW_CFG_SET_UART_BAUD_1, //0x12
-    HW_CFG_READ_LOCAL_NAME, //0x13
+    HW_CFG_SET_BD_GOOGLE_ADDR,   //0xe w2 used
+    HW_CFG_AML_POWER_END,   //0xf
+    HW_CFG_SET_MANU_DATA,   //0x10
+    HW_CFG_START,       //0x11
+    HW_CFG_SET_UART_CLOCK,  //0x12
+    HW_CFG_SET_UART_BAUD_1, //0x13
+    HW_CFG_READ_LOCAL_NAME, //0x14
     //HW_CFG_DL_MINIDRIVER,   //
-    HW_CFG_DL_FW_PATCH,     //0x14
-    HW_CFG_SET_UART_BAUD_2, //0x15
-    HW_CFG_AML_UPDATE_BAUDRATE, //0x16
-    HW_CFG_GET_REG, //0x17
-    HW_CFG_AML_DOWNLOAD_FIRMWARE_CHANGE_BAUDRATE_UART,  //0x18
-    HW_CFG_AML_DOWNLOAD_FIRMWARE_FINISH_UART,   //0x19
-    HW_CFG_AML_DOWNLOAD_FIRMWARE_TEST_UART, //0x1a
-    HW_CFG_AML_SET_BAUDRATE, //0x1b
+    HW_CFG_DL_FW_PATCH,     //0x15
+    HW_CFG_SET_UART_BAUD_2, //0x16
+    HW_CFG_AML_UPDATE_BAUDRATE, //0x17
+    HW_CFG_GET_REG, //0x18
+    HW_CFG_AML_DOWNLOAD_FIRMWARE_CHANGE_BAUDRATE_UART,  //0x19
+    HW_CFG_AML_DOWNLOAD_FIRMWARE_FINISH_UART,   //0x1a
+    HW_CFG_AML_DOWNLOAD_FIRMWARE_TEST_UART, //0x1b
+    HW_CFG_AML_SET_BAUDRATE, //0x1c
 #if (USE_CONTROLLER_BDADDR == TRUE)
-    HW_CFG_READ_BD_ADDR,   //0x1c
+    HW_CFG_READ_BD_ADDR,   //0x1d
 #endif
 };
 
@@ -342,6 +344,7 @@ uint8_t hw_cfg_download_firmware_start_cpu_uart_before(void *p_mem, HC_BT_HDR *p
 uint8_t hw_cfg_download_firmware_start_cpu_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_set_params(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_set_bd_addr(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
+uint8_t hw_cfg_set_bd_google_addr(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_bt_power_end(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t wole_config_write_manufacture(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
 uint8_t hw_cfg_start(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p);
@@ -376,26 +379,26 @@ uint8_t (*hw_config_func[])(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p) =
     hw_cfg_download_firmware_start_cpu_uart,    //0xb
     hw_cfg_set_params,      //0xc
     hw_cfg_set_bd_addr,     //0xd
-    hw_cfg_bt_power_end,   //0xe
-    wole_config_write_manufacture,    //0xf
-    hw_cfg_start,       //0x10
-    hw_cfg_set_uart_clock,  //0x11
-    hw_cfg_set_uart_baud1, //0x12
-    hw_cfg_read_local_name, //0x13
+    hw_cfg_set_bd_google_addr,    //0xe w2 used
+    hw_cfg_bt_power_end,   //0xf
+    wole_config_write_manufacture,    //0x10
+    hw_cfg_start,       //0x11
+    hw_cfg_set_uart_clock,  //0x12
+    hw_cfg_set_uart_baud1, //0x13
+    hw_cfg_read_local_name, //0x14
     //hw_cfg_dl_minidriver,   //
-    hw_cfc_null_2,     //0x14
-    hw_cfg_set_uart_baud_2, //0x15
-    hw_cfg_update_baudrate, //0x16
-    hw_cfg_get_reg, //0x17
-    hw_cfg_download_firmware_change_baudrate_uart,  //0x18
-    hw_cfg_download_firmware_finish_uart,   //0x19
-    hw_cfg_download_firmware_test_uart, //0x1a
-    hw_cfg_set_baudrate, //0x1b
+    hw_cfc_null_2,     //0x15
+    hw_cfg_set_uart_baud_2, //0x16
+    hw_cfg_update_baudrate, //0x17
+    hw_cfg_get_reg, //0x18
+    hw_cfg_download_firmware_change_baudrate_uart,  //0x19
+    hw_cfg_download_firmware_finish_uart,   //0x1a
+    hw_cfg_download_firmware_test_uart, //0x1b
+    hw_cfg_set_baudrate, //0x1c
 #if (USE_CONTROLLER_BDADDR == TRUE)
-    hw_cfg_read_bd_addr,   //0x1c
+    hw_cfg_read_bd_addr,   //0x1d
 #endif
 };
-
 
 /******************************************************************************
 **  Externs
@@ -974,7 +977,7 @@ static uint8_t hw_config_set_rf_params(HC_BT_HDR *p_buf)
         if (amlbt_transtype.interface == AML_INTF_PCIE \
                                          || (amlbt_transtype.interface == AML_INTF_SDIO && amlbt_transtype.family_id == AML_W1U))
         {
-            bt_sdio_fd = userial_vendor_uart_open();
+            bt_sdio_fd = userial_vendor_devchar_open();
             if (bt_sdio_fd < 0)
             {
                 BTHWDBG("hw_config_set_rf_params open failed!");
@@ -985,10 +988,10 @@ static uint8_t hw_config_set_rf_params(HC_BT_HDR *p_buf)
         {
             BTHWDBG("write failed!");
         }
-        if (bt_sdio_fd)
+        if (bt_sdio_fd > 0)
         {
             close(bt_sdio_fd);
-            bt_sdio_fd = 0;
+            bt_sdio_fd = -1;
         }
     }
 
@@ -1589,7 +1592,7 @@ uint8_t hw_cfg_download_firmware_iccm_uart(void *p_mem, HC_BT_HDR *p_buf, uint8_
     uint8_t *p_dn = 0;
     if (amlbt_transtype.family_id > AML_W1U && amlbt_transtype.interface == AML_INTF_SDIO)
     {
-        bt_sdio_fd = userial_vendor_uart_open();
+        bt_sdio_fd = userial_vendor_devchar_open();
         if (bt_sdio_fd < 0)
         {
             BTHWDBG("hw_cfg_download_firmware_iccm_uart open failed!");
@@ -2153,8 +2156,37 @@ uint8_t hw_cfg_set_bd_addr(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
     {
         ALOGE("%s:Failed to set amlbt version in %s", __func__, VENDOR_AMLBTVER_PROPERTY);
     }
-    ALOGD("vendor lib fwcfg completed");
-    ALOGD("vendor lib config manf data");
+    UINT16_TO_STREAM(p, HCI_VSC_WAKE_WRITE_DATA);
+    *p++ = APCF_config_manf_data[0];
+    for (i = 1; i < (int)sizeof(APCF_config_manf_data); i++)
+        *p++ = APCF_config_manf_data[i];
+    p_buf->len = HCI_CMD_PREAMBLE_SIZE + APCF_config_manf_data[0];
+    hw_cfg_cb.state = HW_CFG_SET_MANU_DATA;
+    if (amlbt_transtype.family_id == AML_W2)
+    {
+        hw_cfg_cb.state = HW_CFG_SET_BD_GOOGLE_ADDR;
+    }
+    else
+    {
+        hw_cfg_cb.state = HW_CFG_SET_MANU_DATA;
+        ALOGD("vendor lib fwcfg completed");
+        ALOGD("vendor lib config manf data");
+    }
+    //Set ADV parameter of remote controller using to wake up device when suspend
+    is_proceeding = bt_vendor_cbacks->xmit_cb(HCI_VSC_WAKE_WRITE_DATA, p_buf, hw_config_cback);
+
+    return is_proceeding;
+}
+
+uint8_t hw_cfg_set_bd_google_addr(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
+{
+    int i;
+    uint8_t is_proceeding = FALSE;
+
+    //uint8_t APCF_config_manf_data[] = {0x05, 0x19, 0xff,0x01, 0x0a,0xb}; //public version
+    //uint8_t APCF_config_manf_data[] = {0x05, 0x25, 0xfe, 0x00, 0x00, 0x01}; //xiaomi
+    uint8_t APCF_config_manf_data[] = {0x05, 0x13, 0x16, 0x01, 0x04, 0x06}; //google
+
     UINT16_TO_STREAM(p, HCI_VSC_WAKE_WRITE_DATA);
     *p++ = APCF_config_manf_data[0];
     for (i = 1; i < (int)sizeof(APCF_config_manf_data); i++)
@@ -2163,6 +2195,9 @@ uint8_t hw_cfg_set_bd_addr(void *p_mem, HC_BT_HDR *p_buf, uint8_t *p)
     hw_cfg_cb.state = HW_CFG_SET_MANU_DATA;
     //Set ADV parameter of remote controller using to wake up device when suspend
     is_proceeding = bt_vendor_cbacks->xmit_cb(HCI_VSC_WAKE_WRITE_DATA, p_buf, hw_config_cback);
+    BTHWDBG("HW_CFG_SET_BD_GOOGLE_ADDR");
+    ALOGD("vendor lib fwcfg completed");
+    ALOGD("vendor lib config manf data");
 
     return is_proceeding;
 }
@@ -3675,7 +3710,7 @@ void hw_disbt_configure_cback(void *p_mem)
     }
     else
     {
-        state = HW_CLEAR_LIST;
+        state = HW_SHUTDOWN_LESCAN;
     }
 
     if (rsp[0] == 0x0e && rsp[1] == 0x04)
@@ -3856,4 +3891,113 @@ void hw_poweroff_clear_list()
     }
 }
 
+void hw_shutdown_lescan_write_cback(void *p_mem)
+{
+    HC_BT_HDR *p_evt_buf = (HC_BT_HDR *)p_mem;
+    uint8_t *rsp = (uint8_t *)p_evt_buf->data;
+    BTHWDBG("evt read: %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x\n", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6], rsp[7], rsp[8],rsp[9], rsp[10], rsp[11]);
+    state = HW_RESET_CLOSE;
+    if (rsp[0] == 0x0e && rsp[5] == 0x00)
+    {
+        BTHWDBG("hw shutdown lescan write success!\n");
+    }
+    else
+    {
+        BTHWDBG("hw shutdown lescan write failed!\n");
+    }
+    if (bt_vendor_cbacks)
+    {
+        bt_vendor_cbacks->dealloc(p_evt_buf);
+    }
+}
+
+void hw_shutdown_lescan_read_cback(void *p_mem)
+{
+    unsigned char set_A52_write[] = {0xd0, 0x00, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00};
+    HC_BT_HDR *p_buf = NULL;
+    uint8_t *p;
+    int i = 0;
+    HC_BT_HDR *p_evt_buf = (HC_BT_HDR *)p_mem;
+    uint8_t *rsp = (uint8_t *)p_evt_buf->data;
+    BTHWDBG("evt read: %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x\n", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6], rsp[7], rsp[8],rsp[9], rsp[10], rsp[11]);
+
+    if (rsp[0] == 0x0e && rsp[5] == 0x00)
+    {
+        BTHWDBG("hw shutdown lescan read success!\n");
+    }
+    else
+    {
+        BTHWDBG("hw shutdown lescan read failed!\n");
+    }
+    if (bt_vendor_cbacks)
+    {
+        bt_vendor_cbacks->dealloc(p_evt_buf);
+    }
+    rsp[10] |= 0x08;
+    set_A52_write[4] = rsp[7];
+    set_A52_write[5] = rsp[8];
+    set_A52_write[6] = rsp[9];
+    set_A52_write[7] = rsp[10];
+    if (bt_vendor_cbacks)
+    {
+        /* Must allocate command buffer via HC's alloc API */
+        p_buf = (HC_BT_HDR *)bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + \
+                HCI_CMD_PREAMBLE_SIZE + 8);
+    }
+    if (p_buf)
+    {
+        p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
+        p_buf->offset = 0;
+        p_buf->layer_specific = 0;
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE;
+
+        p = (uint8_t *)(p_buf + 1);
+        UINT16_TO_STREAM(p, 0xfcf1);
+        *p++ = 8; /* parameter length */
+        for (; i < sizeof(set_A52_write); i++)
+        {
+            UINT8_TO_STREAM(p, set_A52_write[i]);
+        }
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE + 8;
+        /* Send command via HC's xmit_cb API */
+        bt_vendor_cbacks->xmit_cb(0xfcf1, \
+                                    p_buf, hw_shutdown_lescan_write_cback);
+        BTHWDBG("hw shutdown lescan write send success!\n");
+    }
+}
+
+void hw_shutdown_lescan()
+{
+    HC_BT_HDR *p_buf = NULL;
+    uint8_t *p;
+    int i = 0;
+    unsigned char set_A52_read[] = {0xd0, 0x00, 0xf0, 0x00};
+    if (bt_vendor_cbacks)
+    {
+        /* Must allocate command buffer via HC's alloc API */
+        p_buf = (HC_BT_HDR *)bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + \
+                HCI_CMD_PREAMBLE_SIZE + 4);
+    }
+
+    if (p_buf)
+    {
+        p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
+        p_buf->offset = 0;
+        p_buf->layer_specific = 0;
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE;
+
+        p = (uint8_t *)(p_buf + 1);
+        UINT16_TO_STREAM(p, 0xfcf0);
+        *p++ = 4; /* parameter length */
+        for (; i < sizeof(set_A52_read); i++)
+        {
+            UINT8_TO_STREAM(p, set_A52_read[i]);
+        }
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE + 4;
+        /* Send command via HC's xmit_cb API */
+        bt_vendor_cbacks->xmit_cb(0xfcf0, \
+                                    p_buf, hw_shutdown_lescan_read_cback);
+        BTHWDBG("hw shutdown lescan read send success!\n");
+    }
+}
 
