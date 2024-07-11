@@ -177,6 +177,9 @@ struct aml_hwif_sdio {
 };
 
 struct aml_hif_sdio_ops {
+    //sdio func0 for self define domain, cmd52
+    int (*hi_self_define_domain_func0_write8)(int addr, unsigned char data);
+    unsigned char (*hi_self_define_domain_func0_read8)(int addr);
     //sdio func1 for self define domain, cmd52
     int (*hi_self_define_domain_write8)(int addr, unsigned char data);
     unsigned char (*hi_self_define_domain_read8)(int addr);
